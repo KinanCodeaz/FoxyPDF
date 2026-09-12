@@ -2,12 +2,18 @@
     Copyright (c) 2019 Sagar Gurtu
     Licensed under the MIT License.
     See License in the project root for license information.
+
+    v1.2.0 changes by KinanDev:
+    - Added Content-Security-Policy (no remote code, no external network).
+    - Sandboxed the PDF viewer iframe (allow-same-origin + allow-scripts only:
+      the viewer runs, but cannot open popups, navigate the app, or reach Node).
 -->
 <!DOCTYPE html>
 <html>
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self';">
     <title>Lector</title>
     <link rel="stylesheet" href="css/index.css">
 </head>
@@ -23,7 +29,7 @@
         </div>
     </div>
     <div id='viewContainer'>
-        <iframe id='viewer'></iframe>
+        <iframe id='viewer' sandbox="allow-same-origin allow-scripts" title="PDF viewer"></iframe>
     </div>
     <script src="js/index.js"></script>
 </body>

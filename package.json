@@ -1,6 +1,6 @@
 {
     "name": "lector",
-    "version": "1.1.0",
+    "version": "1.2.2",
     "productName": "Lector",
     "description": "A simple PDF Reader",
     "main": "src/js/main.js",
@@ -11,24 +11,26 @@
         "postinstall": "electron-builder install-app-deps"
     },
     "author": "Sagar Gurtu",
+    "contributors": [
+        "KinanDev (v1.2.0 security & modernization update)"
+    ],
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/sagargurtu/lector.git"
+        "url": "https://github.com/KinanCodeaz/lector.git"
     },
     "dependencies": {
-        "custom-electron-titlebar": "^3.0.9"
+        "pdf-lib": "^1.17.1"
     },
     "devDependencies": {
-        "custom-electron-titlebar": "^3.0.9",
-        "electron": "^5.0.4",
-        "electron-builder": "^21.1.1"
+        "electron": "^44.3.0",
+        "electron-builder": "^26.15.3"
     },
     "build": {
         "appId": "lector",
         "productName": "Lector",
         "copyright": "Copyright (c) 2019 Sagar Gurtu",
-        "buildVersion": "1.1.0",
+        "buildVersion": "1.2.2",
         "win": {
             "target": "NSIS",
             "icon": "./src/assets/icons/win/icon.ico",

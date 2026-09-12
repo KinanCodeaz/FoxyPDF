@@ -2,35 +2,36 @@
     Copyright (c) 2019 Sagar Gurtu
     Licensed under the MIT License.
     See License in the project root for license information.
+
+    v1.2.0 changes by KinanDev:
+    - Removed require('electron').remote (deleted module, RCE vector).
+    - Close button now uses the sandboxed preload bridge.
+    - Version bumped to 1.2.0, original Author credit preserved.
 -->
 <!DOCTYPE html>
 <html>
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self';">
     <title>Lector - About</title>
     <link rel="stylesheet" href="css/about.css">
 </head>
 
 <body>
-    <div id='titlebar'></div>
     <img id='logo' src='assets/images/logo.png' />
     <div id='info'>
         <div id='label'>Lector</div>
         <div id='description'>A simple PDF reader</div>
         <div id='stats'>
-            <div>Version: 1.1.0</div>
-            <div>Author: Sagar Gurtu</div>
+            <div>Version: 1.2.2</div>
+            <div>Original by Sagar Gurtu (v1.1.0, MIT)</div>
+            <div>Developed by KinanDev since v1.2.0</div>
         </div>
     </div>
-    <div id='close'>&times;</div>
-    <script>
-        const remote = require('electron').remote
-        document.getElementById('close').addEventListener('click', event => {
-            let window = remote.getCurrentWindow()
-            window.close()
-        })
-    </script>
+    <!-- v1.2.1: the duplicate custom × button was removed. The window now
+         closes with the single native title-bar button (frame is native
+         since v1.2.0). -->
 </body>
 
 </html>

@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,300i,400,400i,600,600i,700,700i&display=swap');
+/* v1.2.0 (KinanDev): removed Google Fonts @import, see index.css. */
+/* v1.2.1 (KinanDev): removed #titlebar (dead custom-frame drag area) and
+   #close (duplicate close button; the native title-bar button is used). */
 
 html {
     font-family: "Segoe UI", "San Francisco", "Source Sans Pro", sans-serif;
@@ -7,15 +9,6 @@ html {
 body {
     overflow: hidden;
     user-select: none;
-}
-
-#titlebar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: calc(100% - 25px);
-    height: 25px;
-    -webkit-app-region: drag;
 }
 
 #logo {
@@ -45,14 +38,4 @@ body {
 #stats {
     margin-top: 10px;
     font-size: 12px;
-}
-
-#close {
-    position: absolute;
-    right: 0;
-    top: 0;
-    margin-right: 10px;
-    font-size: 24px;
-    font-weight: bold;
-    cursor: pointer;
 }

@@ -1,79 +1,94 @@
-<h1 align="center">
-  <a href="https://sagargurtu.github.io/lector/"><img src="https://github.com/sagargurtu/lector/blob/master/docs/assets/images/logo.png" width=25 /></a> Lector
-</h1>
+# Lector — Lightweight PDF Reader & Organizer
 
-<p align="center">
-  <strong>A simple PDF Reader built using Electron and PDF.js</strong>
-</p>
+> **Fork note (rights preserved):** original project by **Sagar Gurtu**
+> (v1.1.0, MIT License). Developed since v1.2.0 by **KinanDev**.
+> The original `LICENSE` file and all copyright headers are kept intact.
+> PDF.js viewer by Mozilla (Apache 2.0) — vendored files untouched.
 
-<p align="center">
-  <a href="https://github.com/sagargurtu/lector/releases"><img alt="Release" src="https://img.shields.io/github/release/sagargurtu/lector.svg"/></a>
-  <a href="https://github.com/sagargurtu/lector/blob/master/LICENSE"><img alt="License" src="https://img.shields.io/github/license/sagargurtu/lector.svg"/></a>
-  <a href="https://github.com/sagargurtu/lector/issues"><img alt="Issues" src="https://img.shields.io/github/issues/sagargurtu/lector.svg"/></a>
-  <a href="https://github.com/sagargurtu/lector"><img alt="Code Size" src="https://img.shields.io/github/languages/code-size/sagargurtu/lector.svg"/></a>
-  <a href="https://github.com/sagargurtu/lector"><img alt="Downloads" src="https://img.shields.io/github/downloads/sagargurtu/lector/total.svg"/></a>
-</p>
+A fast, lightweight PDF reader built with Electron and PDF.js, now with
+annotations, page organizer, image stamps and smart save — and still only
+one small runtime dependency (`pdf-lib`). No accounts, no cloud, no AI.
 
-<p align="center">
-  <img alt="Tabbed View" src="https://github.com/sagargurtu/lector/blob/master/docs/assets/screenshots/Tabbed%20View.png" width=800/>
-</p>
+![License](LICENSE)
 
-<p align="center">
-  <img alt="Empty View" src="https://github.com/sagargurtu/lector/blob/master/docs/assets/screenshots/Empty%20View.png" width=800/>
-</p>
+## Features (v1.2.2)
 
-#### Dependencies
-* <a href="https://electronjs.org/">Electron <img alt="Electron" src="https://img.shields.io/github/package-json/dependency-version/sagargurtu/lector/dev/electron.svg"/></a>
-* <a href="https://github.com/AlexTorresSk/custom-electron-titlebar">Custom Electron Titlebar <img alt="Custom Electron Titlebar" src="https://img.shields.io/github/package-json/dependency-version/sagargurtu/lector/dev/custom-electron-titlebar.svg"/></a>
-* <a href="https://www.electron.build/">Electron Builder <img alt="Electron Builder" src="https://img.shields.io/github/package-json/dependency-version/sagargurtu/lector/dev/electron-builder.svg"/></a>
+- Tabbed reading, thumbnails, outline, find, zoom, print (from v1.x).
+- **Annotations**: highlight, rectangle, cover/hide, freehand pen,
+  write-over text (Arabic supported), eraser, undo — adjustable
+  size/shape/color, black default with last-color memory.
+- **Page organizer**: delete (with confirm), drag-reorder, rotate 90°,
+  multi-select, click-to-select top bar, instant apply, real undo.
+- **Image stamps**: 6 built-in icons + PNG/JPG upload, movable + resizable.
+- **Smart save**: dirty dots, `Ctrl+S` overwrite (with `.bak.pdf` backup),
+  `Ctrl+Shift+S` Save As (`*-MODIFIED.pdf`), per-file prompt on close/quit.
+- **Extras**: `Ctrl+Z` undo, Open Recent + last-folder memory, English UI.
 
-#### Libraries Used
-* [PDF.js](https://mozilla.github.io/pdf.js/)
-
-## What's new?
-
-#### v1.1.0
-* PDF file association.
-* New PDF file icons.
-
-#### v1.0.0
-* First release.
-* Tabbed View to easily switch between multiple documents.
-* Document Navigation Tools.
-* Thumbnail and Outline Panes.
-* Find, Go to, Zoom and Print.
+See [CHANGELOG.md](CHANGELOG.md) for the full per-version history and
+[ROADMAP.md](ROADMAP.md) for the v1.2.3 plan.
 
 ## Getting started
 
-### Installation
+### Prerequisites
 
-Download executable from [Releases](https://github.com/sagargurtu/lector/releases)
+- [Node.js](https://nodejs.org/en/) (LTS or newer)
+- [Git](https://git-scm.com/)
 
-### Build from Source
+### Clone
 
-#### Prerequisites
-Install the following dependencies:
-* [Node.js](https://nodejs.org/en/)
-* [Git](https://git-scm.com/)
-
-#### Clone
-Clone this repo to your local machine using:
 ```
-git clone https://github.com/sagargurtu/lector.git
-```
-
-#### Run
-```
+git clone https://github.com/KinanCodeaz/lector.git
 cd lector
-npm install && npm start
 ```
 
-#### Build distributions
+### Run (no install — runs from source, touches nothing on the system)
+
+```
+npm install
+npm start
+```
+
+Open a file directly:
+
+```
+npx electron . "C:\path\to\file.pdf"
+```
+
+### Build distributions
+
 ```
 npm run dist
 ```
 
-## License
-[PDF.js](https://mozilla.github.io/pdf.js/) is under [Apache License 2.0](https://github.com/mozilla/pdf.js/blob/master/LICENSE)
+Current build target: **Windows (NSIS)**. Linux/macOS targets can be
+added to the `build` section of `package.json` (the code itself is
+cross-platform: no OS-specific calls, `path.join` everywhere).
 
-This project is under [MIT](https://github.com/sagargurtu/lector/blob/master/LICENSE) License
+## Project layout
+
+```
+src/
+  index.html / about.html   app shell (sandboxed, CSP, no Node)
+  js/main.js                main process (windows, menus, save, sessions)
+  js/preload.js             minimal contextBridge (whitelisted IPC only)
+  js/index.js               tabs + viewer relay
+  js/annot-burn.js          burn annotations into PDF (pdf-lib)
+  js/page-ops.js            delete / reorder / rotate on PDF bytes
+  js/recent.js              recent files + last folder
+  lib/pdfjs/                vendored Mozilla PDF.js (Apache 2.0, untouched
+                            except 4 marked include-lines in viewer.html)
+  lib/pdfjs/web/lector-annot.js/.css   annotation + organizer layer (MIT)
+```
+
+## Security model
+
+- No Node.js in any renderer (`contextIsolation` + `sandbox` + preload).
+- Viewer iframe sandboxed; strict `Content-Security-Policy` (`self` only).
+- No network code, no open ports; Google Fonts removed (fully offline).
+- `npm audit`: 0 vulnerabilities (only `pdf-lib` at runtime).
+
+## License
+
+- This project: [MIT](LICENSE) — Copyright (c) 2019 Sagar Gurtu
+  (v1.2.x additions by KinanDev, same license).
+- [PDF.js](https://mozilla.github.io/pdf.js/): Apache License 2.0.

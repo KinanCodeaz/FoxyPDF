@@ -30,6 +30,9 @@ See https://github.com/adobe-type-tools/cmap-resources
 
 
     <link rel="stylesheet" href="viewer.css">
+    <!-- Lector v1.2.1 (KinanDev, MIT): annotation overlay styles.
+         Mozilla viewer files are otherwise untouched (Apache 2.0). -->
+    <link rel="stylesheet" href="lector-annot.css">
 
 
 <!-- This snippet is used in production (included from viewer.html) -->
@@ -38,6 +41,9 @@ See https://github.com/adobe-type-tools/cmap-resources
 
 
     <script src="viewer.js"></script>
+    <!-- Lector v1.2.1 (KinanDev, MIT): lightweight annotation layer
+         (highlight/rect/cover/pen/text/eraser). Mozilla code untouched. -->
+    <script src="lector-annot.js"></script>
 
   </head>
 
@@ -226,6 +232,15 @@ See https://github.com/adobe-type-tools/cmap-resources
                 </a>
 
                 <div class="verticalToolbarSeparator hiddenSmallView"></div>
+
+                <!-- Lector v1.2.2 (KinanDev): visible entry points. Mozilla code untouched. -->
+                <button id="lectorOrganize" class="toolbarButton" title="Organize pages: delete / reorder / rotate" tabindex="35">
+                  <span>Organize pages</span>
+                </button>
+
+                <button id="lectorStamp" class="toolbarButton" title="Add an image or icon over the page" tabindex="35">
+                  <span>Add image</span>
+                </button>
 
                 <button id="secondaryToolbarToggle" class="toolbarButton" title="Tools" tabindex="36" data-l10n-id="tools">
                   <span data-l10n-id="tools_label">Tools</span>
