@@ -1,5 +1,24 @@
 # Lector — Lightweight PDF Reader & Organizer
+## 📸 Screenshots
 
+<table>
+  <tr>
+    <td align="center">
+      <img src="screenshots/screenshot-main.png" alt="Main Interface" width="400"/><br/>
+      <b>Main Interface</b>
+    </td>
+    <td align="center">
+      <img src="screenshots/screenshot_edit.png" alt="Edit Interface" width="400"/><br/>
+      <b>Edit Interface</b>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <img src="screenshots/screenshot-annotations.png" alt="Annotations" width="800"/><br/>
+      <b>PDF with Annotation Tools</b>
+    </td>
+  </tr>
+</table>
 > **Fork note (rights preserved):** original project by **Sagar Gurtu**
 > (v1.1.0, MIT License). Developed since v1.2.0 by **KinanDev**.
 > The original `LICENSE` file and all copyright headers are kept intact.
