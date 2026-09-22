@@ -1,21 +1,26 @@
-# Lector — Lightweight PDF Reader & Organizer
-## 📸 Screenshots
+
+# FoxyPDF — Lightweight PDF Reader & Organizer
+## 📸 Screenshots (v1.3.0 Final)
 
 <table>
   <tr>
     <td align="center">
-      <img src="screenshots/screenshot-main.png" alt="Main Interface" width="400"/><br/>
-      <b>Main Interface</b>
+      <img src="screenshots/screen%201%20interface.png" alt="Main interface" width="400"/><br/>
+      <b>Main interface</b>
     </td>
     <td align="center">
-      <img src="screenshots/screenshot_edit.png" alt="Edit Interface" width="400"/><br/>
-      <b>Edit Interface</b>
+      <img src="screenshots/screen%202%20support%20arabic.png" alt="Arabic support" width="400"/><br/>
+      <b>Arabic support</b>
     </td>
   </tr>
   <tr>
-    <td colspan="2" align="center">
-      <img src="screenshots/screenshot-annotations.png" alt="Annotations" width="800"/><br/>
-      <b>PDF with Annotation Tools</b>
+    <td align="center">
+      <img src="screenshots/screen%203%20black.png" alt="Night reading mode" width="400"/><br/>
+      <b>Night reading mode (black pages)</b>
+    </td>
+    <td align="center">
+      <img src="screenshots/screen%204%20edit%20pages.png" alt="Edit pages" width="400"/><br/>
+      <b>Edit pages: delete, reorder, rotate</b>
     </td>
   </tr>
 </table>
