@@ -2,19 +2,34 @@
 
 ## v1.3.0 Final (by KinanDev)
 
-- **Word→PDF converter removed**: after extensive work the conversion output
-  never matched Word's fidelity, so the feature was dropped entirely.
-  FoxyPDF 1.3.0 Final is a pure offline PDF reader + annotator. All
-  converter code, windows, menus, IPC channels and dependencies
-  (`@xmldom/xmldom`, `jszip`) were deleted.
-- **Full code audit**: one shared `src/js/theme-list.js` (was 5 copy-pasted
-  theme lists), single `writeSidecar()` writer with file fingerprint,
-  unified dataURL decoder in `annot-burn.js`, fixed a bookmark crash
-  (`toggleBookmark` after `clearBookmarks`), removed dead menus, debug logs
-  and stale docs. Verified by execution tests (sidecar logic, burn pipeline).
-- Smaller installer: English-only locale pack, pruned file exclusions.
+FoxyPDF 1.3.0 Final is a pure offline PDF reader + annotator.
 
-## v1.3.0 — Word→PDF engine switched to docx-preview (by KinanDev)
+- **New identity**: renamed **Lector → FoxyPDF** (`com.kinandev.foxypdf`),
+  brand-new fox logo, new window/file icons and installer branding.
+- **13 color themes** + 6 accents on the Dark family, themed custom
+  menubar, persisted locally (single shared `theme-list.js` source).
+- **Recent files**: recent panel + Open Recent menu with last-folder memory.
+- **Night reading mode** (`N` / View menu / rail button): white pages turn
+  black to protect the reader's eyes; persisted per viewer.
+- **Annotation toolbar rebuilt** as a docked rail: highlight, rectangle,
+  cover, freehand pen, write-over text, image stamps, eraser, undo.
+- **Arabic support**: Noto Sans Arabic UI font, RTL shaping in text stamps.
+- **Page organizer improved**: delete pages (confirm), drag-reorder with
+  baked temps, rotate 90°, multi-select, real undo across reloads.
+- **Installer improved** (NSIS): install-folder choice, optional desktop
+  shortcut (checked by default), Start Menu entry, PDF file association.
+- **Word→PDF converter removed**: its output never matched Word's
+  fidelity, so the feature was dropped entirely — code, windows, menus,
+  IPC channels and dependencies (`@xmldom/xmldom`, `jszip`) deleted.
+- **Full code audit**: shared theme source, single sidecar writer with
+  file fingerprint, unified stamp decoder, bookmark crash fix, dead menus
+  / logs / docs removed. Verified by execution tests.
+
+## v1.3.0-alpha — Word→PDF experiments (by KinanDev) — REMOVED in Final
+
+> Historical note: everything below was alpha-stage converter work. The
+> output never matched Word's fidelity, so the converter was **removed
+> entirely in v1.3.0 Final** (see top entry). Kept here as history only.
 
 - PRIMARY converter is now `docx-preview` (Apache-2.0, offline, ~75KB +
   already-present jszip): renders the .docx exactly like Word — direct
@@ -72,7 +87,7 @@
   to any bookmarked page from the **🔖 panel** (bottom right).
 - Stored per file, local-only.
 
-### Word → PDF (v1.3.0, File → Convert Word (.docx) to PDF…)
+### Word → PDF (alpha only — REMOVED in v1.3.0 Final, see top entry)
 - `mammoth` loader is required **lazily on demand**; rendering uses
   Chromium's own `printToPDF` in a hidden window — fully offline, free,
   no cloud. Saves the resulting PDF wherever you choose and opens it.
