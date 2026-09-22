@@ -39,3 +39,16 @@ body {
     margin-top: 10px;
     font-size: 12px;
 }
+
+/* v1.3.0 (KinanDev): developer name on top (bold), original author small below. */
+#devName {
+    font-weight: bold;
+    font-size: 14px;
+    margin-top: 6px;
+}
+
+#origName {
+    font-size: 10px;
+    color: #777;
+    margin-top: 2px;
+}

@@ -26,10 +26,20 @@ See https://github.com/adobe-type-tools/cmap-resources
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <meta name="google" content="notranslate">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      style-src 'self' 'unsafe-inline';
+      font-src 'self' data:;
+      img-src 'self' data: blob: filesystem:;
+      connect-src 'self';
+      worker-src 'self' blob:;
+    ">
     <title>PDF.js viewer</title>
 
 
     <link rel="stylesheet" href="viewer.css">
+    <link rel="stylesheet" href="../../../css/theme.css">
     <!-- Lector v1.2.1 (KinanDev, MIT): annotation overlay styles.
          Mozilla viewer files are otherwise untouched (Apache 2.0). -->
     <link rel="stylesheet" href="lector-annot.css">
@@ -44,6 +54,7 @@ See https://github.com/adobe-type-tools/cmap-resources
     <!-- Lector v1.2.1 (KinanDev, MIT): lightweight annotation layer
          (highlight/rect/cover/pen/text/eraser). Mozilla code untouched. -->
     <script src="lector-annot.js"></script>
+    <script src="theme-boot-viewer.js"></script>
 
   </head>
 
@@ -238,7 +249,10 @@ See https://github.com/adobe-type-tools/cmap-resources
                   <span>Organize pages</span>
                 </button>
 
-                <button id="lectorStamp" class="toolbarButton" title="Add an image or icon over the page" tabindex="35">
+                <!-- Lector v1.3.0 (KinanDev): the top-bar image button was removed —
+                     image stamps live only in the annotation rail (🖼 tool).
+                     Mozilla code otherwise untouched. -->
+                <button id="lectorStamp" class="toolbarButton" title="Add an image or icon over the page" style="display:none" aria-hidden="true" tabindex="-1">
                   <span>Add image</span>
                 </button>
 

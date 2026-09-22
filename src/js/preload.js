@@ -6,12 +6,14 @@
  *  a malicious PDF cannot reach ipcRenderer, shell, fs or network.
  *----------------------------------------------------------------------------*/
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-const ALLOWED_SEND = new Set(['toggle-menu-items', 'recent-add']);
-const ALLOWED_INVOKE = new Set(['save-annotated', 'save-pdf', 'annot-load', 'annot-save',
+const ALLOWED_SEND = new Set(['toggle-menu-items', 'recent-add', 'custom-menu-action']);
+const ALLOWED_INVOKE = new Set(['save-pdf', 'annot-load', 'annot-save',
     'structure-bake', 'use-temp', 'pick-image', 'confirm-dirty', 'discard-changes',
-    'get-dirty-list', 'get-sidecar']);
+    'get-dirty-list', 'get-sidecar', 'get-theme', 'save-theme', 'get-recent',
+    'state-get-file', 'state-set-lastpage', 'state-toggle-bookmark',
+    'state-clear-bookmarks']);
 const ALLOWED_RECEIVE = new Set([
     'file-open',
     'file-print',
@@ -19,11 +21,12 @@ const ALLOWED_RECEIVE = new Set([
     'file-close',
     'file-save',
     'file-save-as',
-    'file-save-annotated',
     'undo-struct',
     'view-fullscreen',
     'external-file-open',
-    'dirty-changed'
+    'dirty-changed',
+    'set-theme',
+    'night-toggle'
 ]);
 
 contextBridge.exposeInMainWorld('lectorAPI', {
@@ -47,5 +50,15 @@ contextBridge.exposeInMainWorld('lectorAPI', {
     },
     closeAbout() {
         ipcRenderer.send('about-close');
+    },
+    getPathForFile(file) {
+        // v1.3.0: drag & drop — webUtils is the only supported way to read
+        // a dropped file's path from a sandboxed renderer.
+        try {
+            if (!file) { return ''; }
+            return webUtils.getPathForFile(file) || (file.path || '');
+        } catch (e) {
+            return (file && file.path) || '';
+        }
     }
 });

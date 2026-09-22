@@ -13,16 +13,17 @@
  *----------------------------------------------------------------------------*/
 
 const { app, dialog } = require('electron');
+const fs = require('fs');
 const recent = require('./recent');
+const THEME_LIST = require('./theme-list');
 
 exports.buildMenuTemplate = function (win) {
     const recentState = recent.loadRecent();
     const recentItems = recentState.files.map((p, i) => {
-        // v1.2.2: accelerator 1-9 for the first nine (Windows convention).
+        // Accelerator 1-9 for the first nine (Windows convention).
         const item = {
             label: (i < 9 ? '&' + (i + 1) + ' ' : '') + p,
             click() {
-                const fs = require('fs');
                 if (!fs.existsSync(p)) {
                     recent.removeRecent(p); // drops it + rebuilds the menu
                     dialog.showMessageBox(win, {
@@ -56,7 +57,7 @@ exports.buildMenuTemplate = function (win) {
                     id: 'file-open',
                     accelerator: 'CmdOrCtrl+O',
                     async click() {
-                        // v1.2.2: reopen where the user left off.
+                        // Reopen where the user left off.
                         const opts = {
                             properties: ['openFile'],
                             filters: [
@@ -66,8 +67,8 @@ exports.buildMenuTemplate = function (win) {
                         const lastDir = recent.loadRecent().lastDir;
                         if (lastDir) { opts.defaultPath = lastDir; }
                         const { canceled, filePaths } = await dialog.showOpenDialog(win, opts);
-                        // FIX v1.2.0: old code did filename.toString() on the
-                        // whole array (breaks on commas). Send one clean path.
+                        // Send one clean path (never array.toString() —
+                        // that breaks on commas in file names).
                         if (!canceled && filePaths && filePaths.length > 0) {
                             win.webContents.send('file-open', filePaths[0]);
                         }
@@ -76,6 +77,9 @@ exports.buildMenuTemplate = function (win) {
                 {
                     label: 'Open Recent',
                     submenu: recentItems
+                },
+                {
+                    type: 'separator'
                 },
                 {
                     label: 'Print...',
@@ -141,8 +145,8 @@ exports.buildMenuTemplate = function (win) {
             label: 'Edit',
             submenu: [
                 {
-                    // v1.2.2 refinement: visible cross-reload undo (no
-                    // accelerator — never hijacks typing in the viewer).
+                    // Visible cross-reload undo (no accelerator — never
+                    // hijacks typing in the viewer).
                     label: 'Undo last change',
                     id: 'edit-undo',
                     click() {
@@ -154,6 +158,22 @@ exports.buildMenuTemplate = function (win) {
         {
             label: 'View',
             submenu: [
+                {
+                    label: 'Theme',
+                    submenu: THEME_LIST.THEMES.map((t) => ({
+                        label: THEME_LIST.NAMES[t] || t,
+                        type: 'radio',
+                        click() { win.webContents.send('set-theme', t); }
+                    }))
+                },
+                { type: 'separator' },
+                {
+                    // v1.3.0: night reading mode (forwarded to the viewer overlay)
+                    label: 'Night reading mode',
+                    click() {
+                        win.webContents.send('night-toggle')
+                    }
+                },
                 {
                     label: 'Toggle Full Screen',
                     id: 'view-fullscreen',
@@ -182,6 +202,15 @@ exports.buildMenuTemplate = function (win) {
                             focusedWindow.webContents.toggleDevTools();
                         }
                     }
+                }
+            ]
+        },
+        {
+            label: 'Settings',
+            submenu: [
+                {
+                    label: 'Themes…',
+                    click(){ win.webContents.send('set-theme','__palette'); }
                 }
             ]
         },

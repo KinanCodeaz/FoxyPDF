@@ -1,5 +1,91 @@
 # Changelog
 
+## v1.3.0 Final (by KinanDev)
+
+- **Word→PDF converter removed**: after extensive work the conversion output
+  never matched Word's fidelity, so the feature was dropped entirely.
+  FoxyPDF 1.3.0 Final is a pure offline PDF reader + annotator. All
+  converter code, windows, menus, IPC channels and dependencies
+  (`@xmldom/xmldom`, `jszip`) were deleted.
+- **Full code audit**: one shared `src/js/theme-list.js` (was 5 copy-pasted
+  theme lists), single `writeSidecar()` writer with file fingerprint,
+  unified dataURL decoder in `annot-burn.js`, fixed a bookmark crash
+  (`toggleBookmark` after `clearBookmarks`), removed dead menus, debug logs
+  and stale docs. Verified by execution tests (sidecar logic, burn pipeline).
+- Smaller installer: English-only locale pack, pruned file exclusions.
+
+## v1.3.0 — Word→PDF engine switched to docx-preview (by KinanDev)
+
+- PRIMARY converter is now `docx-preview` (Apache-2.0, offline, ~75KB +
+  already-present jszip): renders the .docx exactly like Word — direct
+  colors/sizes, bold/underline, styles, tables, images, RTL/Arabic shaping —
+  then Chromium printToPDF. Verified: German CV keeps blue/red/bold/underline,
+  Arabic sentence keeps logical word order with pdf.js `dir: rtl` markers.
+- `src/docx-render.html` render shell (loads `assets/js/jszip.min.js` BEFORE
+  `docx-preview.min.js` — the UMD build needs a global JSZip), screen-only
+  wrapper gray + box-shadows stripped so they never print.
+- Fallback chain: docx-preview → `docx-html.js` → `mammoth`.
+- `closeHiddenWindow()` on main-window close + `before-quit` so no zombie
+  process holds the single-instance lock (app reopens normally).
+- RTL tables: Word `w:bidiVisual` tables are mirrored (`direction:rtl` via
+  `flipRtlTables`, indexes detected from `document.xml` in document order,
+  applied only on count match) — Arabic column order now matches Word.
+- No more trailing blank page: `preferCSSPageSize:true` + zero page margins.
+- Wider Arabic font fallback stack (Traditional/Simplified Arabic, Tahoma…);
+  original Word font names always preserved first.
+- Publisher rebrand: installer Éditeur + copyright now KinanDev (original
+  MIT copyright by Sagar Gurtu preserved in LICENSE + About, as required).
+- About window: developer name on top (bold), original author small below.
+- Annotation rail: FIXED docked vertical bar (left edge, full height) instead
+  of floating/draggable; hide (–) button pinned FIRST so it can never scroll
+  out of reach; duplicate top-bar image button removed (stamps live only in
+  the rail); native color picker added next to the 8 presets (free, no deps).
+- Night reading mode 🌙 (rail button, View menu, `N` key): inverts page
+  rendering to white-text-on-black, persisted per viewer.
+
+## v1.3.0 — FoxyPDF: rebrand + themes + 4 new reader features (by KinanDev)
+
+> Same rights: original project **Sagar Gurtu** (MIT), PDF.js **Mozilla**
+> (Apache 2.0) — attribution preserved in LICENSE, About and README.
+
+### Rebrand & icon
+- Product renamed **Lector → FoxyPDF**: window titles, About, README,
+  `productName`, `appId` (`com.kinandev.foxypdf`), setup artifact becomes
+  `FoxyPDF_Setup.exe`. Brand-new fox icon (`logo.ico` / `logo.png`).
+
+### 13 themes + accent (🎨 / `T`, or View → Theme)
+- 13 themes (original KillerPDF colour palettes), Dark default, accent
+  colour (6) on Dark/Light/Black/98SE families.
+- Themed custom menubar (File/Edit/View/Settings/Help) matching the theme;
+  native menu is hidden but keeps its accelerators.
+- Theme + accent saved locally (userData, no cloud).
+
+### Drag & drop (v1.3.0)
+- Drop any PDF onto the window → opens in a new tab (drop overlay hint).
+
+### Last-page memory (v1.3.0)
+- The viewer remembers the last page read **per file** (debounced, local
+  JSON) and resumes there next time you open the same PDF.
+
+### Bookmarks (v1.3.0, 🔖 / `Ctrl+B`)
+- Bookmark the current page (or remove it) with one click; jump straight
+  to any bookmarked page from the **🔖 panel** (bottom right).
+- Stored per file, local-only.
+
+### Word → PDF (v1.3.0, File → Convert Word (.docx) to PDF…)
+- `mammoth` loader is required **lazily on demand**; rendering uses
+  Chromium's own `printToPDF` in a hidden window — fully offline, free,
+  no cloud. Saves the resulting PDF wherever you choose and opens it.
+- **Faithful formatting (v1.3.0 refinement)**: the conversion now uses a
+  custom OOXML→HTML converter (`src/js/docx-html.js`, jszip + @xmldom,
+  both already shipped via mammoth) that preserves Word's **direct
+  formatting** — colours, font sizes, bold/italic/underline/strike,
+  alignment (centre/right/justify), indentation, table borders + cell
+  shading, hyperlinks, images and Arabic RTL. `mammoth` stays as the
+  automatic fallback only if a document is too exotic for the converter.
+- Standalone **Convert window** (520×480): pick Word file → choose save
+  location (same folder or custom) → Convert → Open in FoxyPDF.
+
 ## v1.2.2 — Page organizer, image stamps & smart save (by KinanDev)
 
 > Same rights: original project **Sagar Gurtu** (MIT), PDF.js **Mozilla**

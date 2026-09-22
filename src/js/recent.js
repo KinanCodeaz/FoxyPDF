@@ -79,7 +79,20 @@ function removeRecent(pdfPath) {
     }
 }
 
+/** v1.3.10: remember a folder as the default start location for file dialogs. */
+function setLastDir(dir) {
+    if (typeof dir !== 'string' || !dir) return;
+    try {
+        const state = loadRecent();
+        state.lastDir = dir;
+        saveRecent(state);
+    } catch (e) { /* ignore */ }
+    if (onChange) {
+        try { onChange(); } catch (e) { /* ignore */ }
+    }
+}
+
 module.exports = {
-    loadRecent, touchRecent, clearRecent, removeRecent,
+    loadRecent, touchRecent, clearRecent, removeRecent, setLastDir,
     setOnChange(fn) { onChange = fn; }
 };

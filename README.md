@@ -1,4 +1,4 @@
-# Lector — Lightweight PDF Reader & Organizer
+# FoxyPDF — Lightweight PDF Reader & Organizer
 ## 📸 Screenshots
 
 <table>
@@ -19,18 +19,21 @@
     </td>
   </tr>
 </table>
-> **Fork note (rights preserved):** original project by **Sagar Gurtu**
-> (v1.1.0, MIT License). Developed since v1.2.0 by **KinanDev**.
+> **Fork note (rights preserved):** original project **Lector** by
+> **Sagar Gurtu** (v1.1.0, MIT License). **FoxyPDF** is the continued
+> development of Lector by **KinanDev** since v1.2.0 (renamed in v1.3.0).
 > The original `LICENSE` file and all copyright headers are kept intact.
 > PDF.js viewer by Mozilla (Apache 2.0) — vendored files untouched.
 
 A fast, lightweight PDF reader built with Electron and PDF.js, now with
-annotations, page organizer, image stamps and smart save — and still only
-one small runtime dependency (`pdf-lib`). No accounts, no cloud, no AI.
+annotations, page organizer, image stamps, smart save, 13 color themes,
+bookmarks, last-page memory, drag & drop and Word → PDF conversion. No
+accounts, no cloud, no AI, no data collection — conversion runs entirely
+offline (dependency loaded only when you use it).
 
 ![License](LICENSE)
 
-## Features (v1.2.2)
+## Features (v1.3.0 — current release)
 
 - Tabbed reading, thumbnails, outline, find, zoom, print (from v1.x).
 - **Annotations**: highlight, rectangle, cover/hide, freehand pen,
@@ -41,10 +44,18 @@ one small runtime dependency (`pdf-lib`). No accounts, no cloud, no AI.
 - **Image stamps**: 6 built-in icons + PNG/JPG upload, movable + resizable.
 - **Smart save**: dirty dots, `Ctrl+S` overwrite (with `.bak.pdf` backup),
   `Ctrl+Shift+S` Save As (`*-MODIFIED.pdf`), per-file prompt on close/quit.
+- **13 color themes** (🎨 or `T`): Dark default + accent colours, themed
+  custom menubar, saved locally.
+- **Drag & drop**: drop a PDF anywhere on the window → opens a new tab.
+- **Bookmarks** (🔖 or `Ctrl+B`): mark pages per file, jump straight to
+  them; stored locally.
+- **Last-page memory**: reopening a file resumes where you left off.
+- **Word → PDF**: File → Convert Word (.docx) to PDF… — offline and free,
+  preserves Word's colours, sizes, alignment, tables and RTL text.
 - **Extras**: `Ctrl+Z` undo, Open Recent + last-folder memory, English UI.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full per-version history and
-[ROADMAP.md](ROADMAP.md) for the v1.2.3 plan.
+[ROADMAP.md](ROADMAP.md) for the upcoming plan.
 
 ## Getting started
 

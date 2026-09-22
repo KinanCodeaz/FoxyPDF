@@ -59,43 +59,42 @@ function buildInkPath(points) {
     return d;
 }
 
-function pngBytesFromDataUrl(dataUrl) {
+// Shared dataURL decoder for PNG/JPEG stamps. allowJpg=false restricts to
+// PNG (text stamps); maxBytes caps the decoded size before allocating.
+function bytesFromDataUrl(dataUrl, allowJpg, maxBytes) {
     if (typeof dataUrl !== 'string') {
         return null;
     }
-    const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
-    if (!m || m[1].length > Math.ceil((MAX_PNG_BYTES * 4) / 3) + 64) {
+    const m = allowJpg
+        ? /^data:image\/(png|jpe?g);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl)
+        : /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+    if (!m) {
+        return null;
+    }
+    const format = allowJpg ? (m[1] === 'png' ? 'png' : 'jpg') : 'png';
+    const b64 = allowJpg ? m[2] : m[1];
+    if (b64.length > Math.ceil((maxBytes * 4) / 3) + 64) {
         return null;
     }
     try {
-        const buf = Buffer.from(m[1], 'base64');
-        if (buf.length === 0 || buf.length > MAX_PNG_BYTES) {
+        const buf = Buffer.from(b64, 'base64');
+        if (buf.length === 0 || buf.length > maxBytes) {
             return null;
         }
-        return buf;
+        return { bytes: buf, format };
     } catch (e) {
         return null;
     }
 }
 
-// v1.2.2: photo/icon stamps accept PNG or JPEG dataURLs.
+function pngBytesFromDataUrl(dataUrl) {
+    const found = bytesFromDataUrl(dataUrl, false, MAX_PNG_BYTES);
+    return found ? found.bytes : null;
+}
+
+// Photo/icon stamps accept PNG or JPEG dataURLs.
 function imageBytesFromDataUrl(dataUrl) {
-    if (typeof dataUrl !== 'string') {
-        return null;
-    }
-    const m = /^data:image\/(png|jpe?g);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
-    if (!m || m[2].length > Math.ceil((MAX_IMG_BYTES * 4) / 3) + 64) {
-        return null;
-    }
-    try {
-        const buf = Buffer.from(m[2], 'base64');
-        if (buf.length === 0 || buf.length > MAX_IMG_BYTES) {
-            return null;
-        }
-        return { bytes: buf, format: m[1] === 'png' ? 'png' : 'jpg' };
-    } catch (e) {
-        return null;
-    }
+    return bytesFromDataUrl(dataUrl, true, MAX_IMG_BYTES);
 }
 
 /**

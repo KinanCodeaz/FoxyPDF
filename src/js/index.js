@@ -81,6 +81,10 @@
             this._pathMap = {}; // temp display path -> logical original
             this._bakeHist = {}; // logical -> [{tempPath|null, annots}] (cap 5)
             this._pendingScroll = {}; // logical -> 1-based page to land on
+            // v1.3.0: last-page resume + bookmarks (per file, local).
+            this._currentPage = 1;
+            this._bookmarks = [];
+            this._pageSaveTimer = null;
         }
 
         /**
@@ -300,7 +304,8 @@
                     }
                 } else { // If no tabs remaining
                     that._toggleTabContainer(false);
-                    that._updateTitle();
+                    that._toggleBookmarksUi(false); // v1.3.0
+                    that._toggleBackgroundInfo(true);
                 }
                 that._toggleSeek();
                 event.stopPropagation();
@@ -360,8 +365,109 @@
             try {
                 doc.addEventListener('click', this._propagateClick);
                 doc.addEventListener('mousedown', this._propagateClick);
+                // v1.3.0: track the viewer's current page (pdf.js dispatches
+                // a 'pagechange' CustomEvent on the container). Only the
+                // active viewer reports; switching tabs reloads it anyway.
+                doc.addEventListener('pagechange', (e) => {
+                    const p = parseInt(e.pageNumber, 10);
+                    if (isFinite(p) && p >= 1) {
+                        this._currentPage = p;
+                        this._scheduleLastPageSave();
+                    }
+                });
+                // v1.3.0: the vendored pdf.js viewer also attaches drop/dragover
+                // on its #mainContainer, which would redirect the file into the
+                // viewer (bypassing tabs/recent/last-page). Capture & swallow
+                // them here so our own single open-path wins.
+                const viewerHide = (evt) => {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                };
+                doc.documentElement.addEventListener('dragover',
+                    viewerHide, true);
+                doc.documentElement.addEventListener('drop',
+                    (evt) => {
+                        evt.preventDefault();
+                        evt.stopPropagation();
+                        this._openDroppedFiles(evt);
+                    }, true);
             } catch (e) {
                 // Viewer not ready yet; onload will retry.
+            }
+        }
+
+        // v1.3.0: last-page resume — debounce saves so page-flipping during
+        // fast scrolling doesn't hammer the JSON file every frame.
+        _scheduleLastPageSave() {
+            const logical = this._logicalOf(this._currentPath);
+            if (!logical) {
+                return;
+            }
+            if (this._pageSaveTimer) {
+                clearTimeout(this._pageSaveTimer);
+            }
+            const page = this._currentPage;
+            this._pageSaveTimer = setTimeout(() => {
+                api.invoke('state-set-lastpage',
+                    { pdfPath: logical, page }).catch(() => { /* non-fatal */ });
+            }, 400);
+        }
+
+        /**
+         * @desc v1.3.0: drag & drop file opening. The whole window is a drop
+         *       target; any dropped PDF opens in a tab.
+         */
+        _setDropEvents() {
+            let dragDepth = 0;
+            const overlay = document.getElementById('dropOverlay');
+            const showOverlay = () => {
+                if (!overlay) { return; }
+                dragDepth++;
+                overlay.classList.add('visible');
+            };
+            const hideOverlay = () => {
+                if (!overlay) { return; }
+                dragDepth = Math.max(0, dragDepth - 1);
+                if (dragDepth === 0) { overlay.classList.remove('visible'); }
+            };
+            window.addEventListener('dragenter', (e) => {
+                if (e.dataTransfer && e.dataTransfer.types &&
+                    e.dataTransfer.types.indexOf('Files') >= 0) {
+                    e.preventDefault();
+                    showOverlay();
+                }
+            });
+            window.addEventListener('dragover', (e) => {
+                if (e.dataTransfer && e.dataTransfer.types &&
+                    e.dataTransfer.types.indexOf('Files') >= 0) {
+                    e.preventDefault();
+                }
+            });
+            window.addEventListener('dragleave', (e) => {
+                if (!e.relatedTarget) { hideOverlay(); }
+            });
+            window.addEventListener('drop', (e) => {
+                e.preventDefault();
+                hideOverlay();
+                this._openDroppedFiles(e);
+            });
+            // Re-hide after undo-internal async transitions.
+            window.addEventListener('mouseout', () => { dragDepth = Math.max(0, dragDepth - 1); if (dragDepth === 0 && overlay) { overlay.classList.remove('visible'); } });
+        }
+
+        // v1.3.0: shared by the window drop handler and the viewer-iframe
+        // capture handler — extracts dropped file paths (webUtils where
+        // available) and opens PDFs as tabs.
+        _openDroppedFiles(e) {
+            const files = (e.dataTransfer && e.dataTransfer.files) || [];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                let pathName = '';
+                try {
+                    pathName = api.getPathForFile ? api.getPathForFile(file) :
+                        (file.path || '');
+                } catch (err) { pathName = ''; }
+                if (pathName) { this._openFile(pathName); }
             }
         }
 
@@ -426,6 +532,15 @@
             api.send('toggle-menu-items', flag === true);
         }
 
+        // v1.3.0: bookmarks UI (FAB + panel) only makes sense with a tab open.
+        _toggleBookmarksUi(visible) {
+            const fab = document.getElementById('bookmarkFab');
+            const panel = document.getElementById('bookmarkPanel');
+            if (!fab) { return; }
+            fab.classList.toggle('hidden', !visible);
+            if (!visible && panel) { panel.classList.add('hidden'); }
+        }
+
         /**
          * @desc Validates a candidate file path (PDF only, any case).
          */
@@ -445,6 +560,7 @@
                 this._toggleTabContainer(true);
                 this._toggleMenuItems(true);
                 this._toggleBackgroundInfo(false);
+                this._toggleBookmarksUi(true); // v1.3.0
             }
 
             // Switch to tab if already open. v1.2.2 refinement: compare by
@@ -476,9 +592,9 @@
             if (pathName) {
                 const logical = this._logicalOf(pathName);
                 const dot = logical && this._dirty[logical] ? '• ' : '';
-                document.title = dot + this._baseName(logical) + " - Lector";
+                document.title = dot + this._baseName(logical) + " - FoxyPDF";
             } else {
-                document.title = "Lector";
+                document.title = "FoxyPDF";
             }
         }
 
@@ -496,6 +612,7 @@
             api.send('recent-add', pathName); // v1.2.2: recent list + last dir
             this._updateTitle(pathName);
             this._addTab(pathName);
+            this._refreshBookmarks(); // v1.3.0
         }
 
         /**
@@ -518,6 +635,21 @@
                     doc.getElementById('print').dispatchEvent(
                         new Event('click'));
                 }
+            });
+
+            // v1.3.0: night reading mode from the native (hidden) menu
+            api.on('night-toggle', () => {
+                this._askViewer({ ns: 'lector-annot', kind: 'night-toggle' });
+            });
+
+            // v1.3.0: theme switch from menu or palette
+            api.on('set-theme', (theme) => {
+                if (theme === '__palette') {
+                    const p = document.getElementById('themePalette');
+                    if (p) { p.classList.toggle('hidden'); this._buildThemePalette(); }
+                    return;
+                }
+                if (window.foxyTheme) { window.foxyTheme.setTheme(theme); this._buildThemePalette(); }
             });
 
             api.on('file-properties', () => {
@@ -561,14 +693,6 @@
                 }
             });
 
-            // v1.2.1 legacy channel (kept): behaves like Save As.
-            api.on('file-save-annotated', () => {
-                this._propagateClick();
-                if (this._currentPath) {
-                    this._doSave(this._logicalOf(this._currentPath), 'saveas');
-                }
-            });
-
             api.on('view-fullscreen', () => {
                 this._propagateClick();
                 const doc = this._viewerDoc();
@@ -577,6 +701,20 @@
                         .dispatchEvent(new Event('click'));
                 }
             });
+        }
+
+        // v1.3.0: tiny status toast (no library).
+        _toast(msg) {
+            let t = document.getElementById('foxyToast');
+            if (!t) {
+                t = document.createElement('div');
+                t.id = 'foxyToast';
+                document.body.appendChild(t);
+            }
+            t.textContent = msg || '';
+            t.classList.add('show');
+            clearTimeout(this._toastTimer);
+            this._toastTimer = setTimeout(() => { t.classList.remove('show'); }, 3000);
         }
 
         /**
@@ -613,7 +751,7 @@
                 }
             });
             if (this._currentPath && this._logicalOf(this._currentPath) === logical) {
-                document.title = (dirty ? '• ' : '') + base + ' - Lector';
+                document.title = (dirty ? '• ' : '') + base + ' - FoxyPDF';
             }
         }
 
@@ -678,7 +816,22 @@
                                 file: displayFile, page: this._pendingScroll[logical]
                             });
                             delete this._pendingScroll[logical];
+                        } else {
+                            // v1.3.0: resume at the last-read page (unless a
+                            // programmatic scroll is already queued).
+                            api.invoke('state-get-file', { pdfPath: logical })
+                                .then((st) => {
+                                    if (st && st.page && st.page > 1) {
+                                        this._askViewer({
+                                            ns: 'lector-annot', kind: 'scroll-to',
+                                            file: displayFile, page: st.page
+                                        });
+                                    }
+                                }).catch(() => { /* non-fatal */ });
                         }
+                        // v1.3.0: keep per-file bookmarks in memory for the
+                        // active document.
+                        this._refreshBookmarks();
                     }).catch(() => { /* stay annotation-free */ });
                 } else if (m.kind === 'changed') {
                     api.invoke('annot-save', {
@@ -788,7 +941,6 @@
             delete this._undoPrev[logical];
             delete this._undoLast[logical];
             delete this._bakeHist[logical];
-            delete this._pendingScroll[logical];
             delete this._pendingScroll[logical];
             Object.keys(this._pathMap).forEach((k) => {
                 if (this._pathMap[k] === logical) { delete this._pathMap[k]; }
@@ -1039,8 +1191,385 @@
         }
 
         /**
-         * @desc Sets external application events
-         */
+          * @desc v1.3.0: theme palette (FAB + menu)
+          */
+        _buildThemePalette(){
+            const list = document.getElementById('themePaletteList');
+            const fab = document.getElementById('themeFab');
+            if (!list || !window.foxyTheme) return;
+            const cur = window.foxyTheme.getStored();
+            const META = window.foxyTheme.META || {};
+            const themes = window.foxyTheme.THEMES;
+            const names = META.NAMES || {};
+            const dots = META.DOTS || {};
+            list.innerHTML = "";
+            themes.forEach(function(t){
+                const b=document.createElement("button");
+                b.setAttribute("role","menuitemradio");
+                b.setAttribute("aria-checked", t===cur.theme?"true":"false");
+                if(t===cur.theme) b.className="active";
+                const dot=document.createElement("span"); dot.className="dot"; dot.style.background=dots[t]||"#888";
+                const label=document.createElement("span"); label.textContent = (t===cur.theme?"● ":"○ ")+ (names[t]||t);
+                b.appendChild(dot); b.appendChild(label);
+                b.addEventListener("click", function(){ window.foxyTheme.setTheme(t); this._buildThemePalette(); }.bind(this));
+                list.appendChild(b);
+            }.bind(this));
+            // accent row (only for Dark family)
+            const accWrap=document.getElementById('themeAccents');
+            const accList=document.getElementById('themeAccentList');
+            if(accWrap && accList){
+                if((META.DARK_FAMILY||[]).indexOf(cur.theme)>=0){
+                    accWrap.style.display="block";
+                    const accNames=META.ACCENT_NAMES||{};
+                    const accColors=META.ACCENT_COLORS||{};
+                    accList.innerHTML="";
+                    window.foxyTheme.ACCENTS.forEach(function(a){
+                        const b=document.createElement("button"); b.textContent=(a===cur.accent?"● ":"○ ")+(accNames[a]||a);
+                        if(a===cur.accent) b.className="active";
+                        const sw=document.createElement("span"); sw.className="swatch"; sw.style.background=accColors[a]||"#888"; b.prepend(sw);
+                        b.addEventListener("click", function(){ window.foxyTheme.setAccent(a); this._buildThemePalette(); }.bind(this));
+                        accList.appendChild(b);
+                    }.bind(this));
+                } else accWrap.style.display="none";
+            }
+        }
+        _initThemePalette(){
+            const fab=document.getElementById('themeFab');
+            const pal=document.getElementById('themePalette');
+            if(!fab||!pal) return;
+            this._buildThemePalette();
+            fab.addEventListener('click', function(){ pal.classList.toggle('hidden'); this._buildThemePalette(); }.bind(this));
+            document.addEventListener('click', function(e){
+                if(!pal.classList.contains('hidden') && !pal.contains(e.target) && e.target!==fab) pal.classList.add('hidden');
+            });
+            // T shortcut
+            document.addEventListener('keydown', function(e){
+                if(e.key==='t'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&& document.activeElement===document.body){
+                    pal.classList.toggle('hidden'); this._buildThemePalette();
+                }
+            }.bind(this));
+        }
+
+        // v1.3.0: bookmarks — per-file list shown in a small panel.
+        _initBookmarks(){
+            const fab=document.getElementById('bookmarkFab');
+            const panel=document.getElementById('bookmarkPanel');
+            if(!fab||!panel) return;
+            const that=this;
+            fab.addEventListener('click', function(){
+                panel.classList.toggle('hidden');
+                if(!panel.classList.contains('hidden')){ that._refreshBookmarks(); }
+            });
+            document.addEventListener('click', function(e){
+                if(!panel.classList.contains('hidden') && !panel.contains(e.target) && e.target!==fab){
+                    panel.classList.add('hidden');
+                }
+            });
+            // Ctrl+B toggles a bookmark on the current page.
+            document.addEventListener('keydown', function(e){
+                if(e.key==='b'&&(e.ctrlKey||e.metaKey)){
+                    e.preventDefault();
+                    that._toggleBookmark();
+                }
+            });
+            // v1.3.0: N toggles night reading mode (parent has no text
+            // fields, and typing inside the viewer iframe never reaches here).
+            document.addEventListener('keydown', function(e){
+                if((e.key==='n'||e.key==='N')&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+                    that._askViewer({ns:'lector-annot',kind:'night-toggle'});
+                }
+            });
+        }
+
+        _refreshBookmarks() {
+            const logical=this._logicalOf(this._currentPath);
+            if(!logical){ this._bookmarks=[]; this._renderBookmarks(); return; }
+            api.invoke('state-get-file',{pdfPath:logical}).then((st)=>{
+                this._bookmarks = (st && Array.isArray(st.bookmarks)) ? st.bookmarks : [];
+                this._renderBookmarks();
+                // keep the panel in sync even while hidden so reopening is fast
+            }).catch(()=>{ this._bookmarks=[]; });
+        }
+
+        _renderBookmarks(){
+            const panel=document.getElementById('bookmarkPanel');
+            if(!panel) return;
+            panel.innerHTML='';
+            const logical=this._logicalOf(this._currentPath);
+            const title=document.createElement('div');
+            title.className='bookmark-panel-title';
+            title.textContent = this._baseName(logical||'') + ' — ' + this._bookmarks.length + ' bookmark' + (this._bookmarks.length===1?'':'s');
+            panel.appendChild(title);
+            const cur=this._currentPage||1;
+            const add=document.createElement('button');
+            add.className='bookmark-add';
+            add.textContent = this._bookmarks.indexOf(cur)>=0 ? '✕ Remove current page ('+cur+')' : '+ Bookmark current page ('+cur+')';
+            add.addEventListener('click', ()=>{ this._toggleBookmark(); });
+            panel.appendChild(add);
+            if(!this._bookmarks.length){
+                const empty=document.createElement('div');
+                empty.className='bookmark-empty';
+                empty.textContent='No bookmarks yet for this file.';
+                panel.appendChild(empty);
+            } else {
+                this._bookmarks.forEach((p)=>{
+                    const row=document.createElement('div');
+                    row.className='bookmark-row';
+                    const pg=document.createElement('span'); pg.className='bm-page'; pg.textContent='Page '+p;
+                    const rm=document.createElement('span'); rm.className='bm-rm'; rm.textContent='✕';
+                    row.appendChild(pg); row.appendChild(rm);
+                    row.addEventListener('click', ()=>{ this._gotoPage(p); });
+                    rm.addEventListener('click', (e)=>{
+                        e.stopPropagation();
+                        const logical=this._logicalOf(this._currentPath);
+                        if(!logical) return;
+                        api.invoke('state-toggle-bookmark',{pdfPath:logical,page:p}).then(()=>{ this._refreshBookmarks(); }).catch(()=>{});
+                    });
+                    panel.appendChild(row);
+                });
+            }
+        }
+
+        // Jump to a 1-based page inside the active viewer.
+        _gotoPage(page){
+            const p=parseInt(page,10);
+            if(!isFinite(p)||p<1) return;
+            this._askViewer({ ns:'lector-annot', kind:'scroll-to', file:this._currentPath, page:p });
+        }
+
+        _toggleBookmark(){
+            const logical=this._logicalOf(this._currentPath);
+            if(!logical) return;
+            const page=this._currentPage||1;
+            api.invoke('state-toggle-bookmark',{pdfPath:logical,page:page}).then((rec)=>{
+                if(rec){ this._bookmarks = (rec.bookmarks||[]).slice(); this._renderBookmarks(); }
+                this._askViewer({ ns:'lector-annot', kind:'notify', file:this._currentPath,
+                    text:(rec&&rec.bookmarks&&rec.bookmarks.indexOf(page)>=0)?'Bookmarked page '+page:'Bookmark removed (page '+page+')' });
+            }).catch(()=>{});
+        }
+
+        // v1.3.0: Recent files panel — replaces the glitchy submenu with a
+        // clean, compact list. Truncated names, hover shows full path.
+        _initRecent(){
+            const that=this;
+            const panel=document.getElementById('recentPanel');
+            if(!panel) return;
+            document.addEventListener('click', function(e){
+                if(!panel.classList.contains('hidden') && !panel.contains(e.target)){
+                    panel.classList.add('hidden');
+                }
+            });
+            document.addEventListener('keydown', function(e){
+                if(e.key==='Escape') panel.classList.add('hidden');
+            });
+        }
+
+        _showRecentPanel(){
+            const that=this;
+            const panel=document.getElementById('recentPanel');
+            if(!panel) return;
+            // Toggle if already open
+            if(!panel.classList.contains('hidden')){ panel.classList.add('hidden'); return; }
+            panel.innerHTML='';
+            panel.classList.remove('hidden');
+            // Position below the menubar
+            panel.style.left='0px'; panel.style.top='26px';
+            api.invoke('get-recent',{}).then(function(recent){
+                var files=(recent && recent.files)||[];
+                var title=document.createElement('div');
+                title.className='recent-panel-title';
+                title.textContent=files.length?'Recent Files':'No recent files';
+                panel.appendChild(title);
+                if(!files.length){
+                    panel.classList.add('hidden');
+                    return;
+                }
+                files.forEach(function(p){
+                    var row=document.createElement('div');
+                    row.className='recent-row';
+                    row.title=p; // full path on hover
+                    var name=p.replace(/^.*[\\/]/,'');
+                    if(name.length>40) name=name.slice(0,37)+'…';
+                    var span=document.createElement('span');
+                    span.className='name';
+                    span.textContent=name;
+                    var rm=document.createElement('span');
+                    rm.className='remove'; rm.textContent='✕';
+                    rm.addEventListener('click',function(e){
+                        e.stopPropagation();
+                        api.send('custom-menu-action','remove-recent:'+p);
+                        setTimeout(function(){ that._showRecentPanel(); },80);
+                    });
+                    row.appendChild(span);
+                    row.appendChild(rm);
+                    row.addEventListener('click',function(){
+                        panel.classList.add('hidden');
+                        api.send('custom-menu-action','file-open-path:'+p);
+                    });
+                    panel.appendChild(row);
+                });
+                var sep=document.createElement('div');
+                sep.className='recent-sep';
+                panel.appendChild(sep);
+                var clr=document.createElement('button');
+                clr.className='recent-clear'; clr.textContent='Clear Recent';
+                clr.addEventListener('click',function(){
+                    api.send('custom-menu-action','clear-recent');
+                    panel.classList.add('hidden');
+                });
+                panel.appendChild(clr);
+            }).catch(function(){ panel.classList.add('hidden'); });
+        }
+
+        _initCustomMenubar(){
+                       const bar=document.getElementById('customMenubar');
+                       const dd=document.getElementById('menubarDropdown');
+                       const sub=document.getElementById('menubarSubmenu');
+                       const overlay=document.getElementById('menubarOverlay');
+            if(!bar||!dd||!sub||!overlay) return;
+            const that=this;
+            let openMenu=null;
+            let hideTimer=null;
+            function hideAll(){
+                dd.classList.add('hidden');
+                sub.classList.add('hidden');
+                overlay.classList.remove('visible');
+                bar.querySelectorAll('.menu-item.open').forEach(function(el){el.classList.remove('open');});
+                openMenu=null;
+            }
+            function fire(a){
+                api.send('custom-menu-action', a);
+            }
+            function positionSub(){
+                sub.style.left=(dd.offsetLeft+dd.offsetWidth+2)+'px';
+                sub.style.top='0px';
+            }
+            function showSub(type){
+                sub.innerHTML=''; sub.classList.remove('hidden'); positionSub();
+                if(type==='recent'){
+                    api.invoke('get-recent',{}).then(function(recent){
+                        var files=(recent && recent.files)||[];
+                        if(!files.length){ var e=document.createElement('div'); e.className='menu-entry'; e.textContent='(empty)'; e.style.opacity='0.5'; sub.appendChild(e); return; }
+                        files.slice(0,10).forEach(function(p,i){
+                            var b=document.createElement('button'); b.textContent=p; b.title=p;
+                            b.addEventListener('click',function(){ hideAll(); fire('file-open-path',p); });
+                            sub.appendChild(b);
+                        });
+                        var sep=document.createElement('div'); sep.className='sep'; sub.appendChild(sep);
+                        var clr=document.createElement('button'); clr.textContent='Clear Recent';
+                        clr.addEventListener('click',function(){ hideAll(); fire('clear-recent'); });
+                        sub.appendChild(clr);
+                    }).catch(function(){});
+                } else if(type==='theme'){
+                    var META=(window.foxyTheme&&window.foxyTheme.META)||{};
+                    var themes=(window.foxyTheme&&window.foxyTheme.THEMES)||[];
+                    var names=META.NAMES||{};
+                    var cur=window.foxyTheme?window.foxyTheme.getStored().theme:'dark';
+                    themes.forEach(function(t){
+                        var b=document.createElement('button'); b.textContent=(t===cur?'● ':'○ ')+(names[t]||t);
+                        if(t===cur) b.style.color='var(--accent)';
+                        b.addEventListener('click',function(){ hideAll(); if(window.foxyTheme) window.foxyTheme.setTheme(t); });
+                        sub.appendChild(b);
+                    });
+                }
+            }
+            function buildFileMenu(){
+                var hasFile=that._tabs&&that._tabs.length>0;
+                return [
+                    {label:'Open…\tCtrl+O',action:'file-open'},
+                    {label:'Open Recent ▶',action:'__recent'},
+                    {type:'sep'},
+                    {label:'Print…\tCtrl+P',action:'file-print',enabled:hasFile},
+                    {type:'sep'},
+                    {label:'Save\tCtrl+S',action:'file-save',enabled:hasFile},
+                    {label:'Save As…\tCtrl+Shift+S',action:'file-save-as',enabled:hasFile},
+                    {type:'sep'},
+                    {label:'Properties…',action:'file-properties',enabled:hasFile},
+                    {type:'sep'},
+                    {label:'Close',action:'file-close',enabled:hasFile},
+                    {label:'Exit',action:'app-quit'}
+                ];
+            }
+            function buildEditMenu(){
+                return [{label:'Undo last change',action:'undo-struct'}];
+            }
+            function buildViewMenu(){
+                return [
+                    {label:'Theme ▶',action:'__theme',hasSub:true},
+                    {type:'sep'},
+                    {label:'Night reading mode\tN',action:'__night'},
+                    {label:'Bookmarks\tCtrl+B',action:'__bookmarks'},
+                    {label:'Toggle Full Screen\tF11',action:'view-fullscreen'},
+                    {label:'Toggle Developer Tools\tCtrl+Shift+I',action:'toggle-devtools'}
+                ];
+            }
+            function buildSettingsMenu(){
+                return [{label:'Themes…',action:'__palette'}];
+            }
+            function buildHelpMenu(){ return [{label:'About',action:'about'}]; }
+            function show(menu){
+                if(openMenu===menu){ hideAll(); return; }
+                openMenu=menu; sub.classList.add('hidden');
+                overlay.classList.add('visible');
+                bar.querySelectorAll('.menu-item').forEach(function(el){ el.classList.toggle('open',el.dataset.menu===menu); });
+                dd.innerHTML=''; dd.classList.remove('hidden');
+                var rect=bar.querySelector('[data-menu="'+menu+'"]').getBoundingClientRect();
+                dd.style.left=rect.left+'px';
+                var items=[];
+                if(menu==='file') items=buildFileMenu();
+                else if(menu==='edit') items=buildEditMenu();
+                else if(menu==='view') items=buildViewMenu();
+                else if(menu==='settings') items=buildSettingsMenu();
+                else if(menu==='help') items=buildHelpMenu();
+                items.forEach(function(it){
+                    if(it.type==='sep'){ var s=document.createElement('div'); s.className='sep'; dd.appendChild(s); return; }
+                    if(it.hasSub){
+                        var row=document.createElement('div'); row.className='menu-entry'; row.textContent=it.label; row.style.cursor='pointer';
+                        row.addEventListener('mouseenter',function(){ showSub('theme'); });
+                        row.addEventListener('click',function(){ showSub('theme'); });
+                        dd.appendChild(row);
+                        return;
+                    }
+                    if(it.action==='__palette'){
+                        var bp=document.createElement('button'); bp.textContent=it.label;
+                        bp.addEventListener('click',function(){ hideAll(); var p=document.getElementById('themePalette'); if(p){ p.classList.remove('hidden'); that._buildThemePalette(); }});
+                        dd.appendChild(bp); return;
+                    }
+                    if(it.action==='__recent'){
+                        var bp2=document.createElement('button'); bp2.textContent=it.label;
+                        bp2.addEventListener('click',function(){ hideAll(); that._showRecentPanel(); });
+                        dd.appendChild(bp2); return;
+                    }
+                    if(it.action==='__bookmarks'){
+                        var bb=document.createElement('button'); bb.textContent=it.label;
+                        bb.addEventListener('click',function(){ hideAll(); var p=document.getElementById('bookmarkPanel'); if(p){ p.classList.toggle('hidden'); if(!p.classList.contains('hidden')){ that._refreshBookmarks(); } }});
+                        dd.appendChild(bb); return;
+                    }
+                    if(it.action==='__night'){
+                        // v1.3.0: night reading mode (viewer inverts pages, persists itself)
+                        var nb=document.createElement('button'); nb.textContent=it.label;
+                        nb.addEventListener('click',function(){ hideAll(); that._askViewer({ns:'lector-annot',kind:'night-toggle'}); });
+                        dd.appendChild(nb); return;
+                    }
+                    var b=document.createElement('button'); b.textContent=it.label;
+                    if(it.enabled===false) b.disabled=true;
+                    b.addEventListener('click',function(){ hideAll(); fire(it.action); });
+                    dd.appendChild(b);
+                });
+            }
+            bar.querySelectorAll('.menu-item').forEach(function(el){
+                el.addEventListener('click',function(){ show(el.dataset.menu); });
+                el.addEventListener('mouseenter',function(){ if(openMenu&&openMenu!==el.dataset.menu) show(el.dataset.menu); });
+            });
+            sub.addEventListener('mouseenter',function(){ if(hideTimer){ clearTimeout(hideTimer); hideTimer=null; } });
+            sub.addEventListener('mouseleave',function(){ hideTimer=setTimeout(function(){ sub.classList.add('hidden'); },200); });
+            overlay.addEventListener('click',function(){ hideAll(); });
+            document.addEventListener('keydown',function(e){ if(e.key==='Escape') hideAll(); });
+        }
+
+        /**
+          * @desc Sets external application events
+          */
         _setExternalEvents() {
             let that = this;
             api.on('external-file-open', (args) => {
@@ -1057,6 +1586,11 @@
             this._setWindowEvents();
             this._setExternalEvents();
             this._setAnnotBridge(); // v1.2.1
+            this._initThemePalette(); // v1.3.0
+            this._initCustomMenubar(); // v1.3.0 themed File/Edit/View bar
+            this._initBookmarks(); // v1.3.0
+            this._setDropEvents(); // v1.3.0
+            this._initRecent(); // v1.3.0
             // v1.2.2 refinement: NO beforeunload handler here on purpose.
             // The main process owns the dirty prompts; a renderer-side
             // handler would stack Chrome's own dialog on top and trap quit.

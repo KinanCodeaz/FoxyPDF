@@ -16,6 +16,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const crypto = require('crypto');
 const { app, BrowserWindow, Menu, ipcMain, shell, dialog } = require('electron');
 // v1.2.2 refinement: English-only UI — pin Chromium locale so the vendored
@@ -24,6 +25,9 @@ app.commandLine.appendSwitch('lang', 'en-US');
 const { buildMenuTemplate } = require('./menutemplate');
 const { burnAnnotations } = require('./annot-burn');
 const { applyStructure } = require('./page-ops');
+const readerState = require('./reader-state');
+const recent = require('./recent');
+const THEME_LIST = require('./theme-list');
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -61,19 +65,17 @@ function createWindow() {
         height: 700,
         minWidth: 300,
         minHeight: 300,
-        icon: path.join(__dirname, '..', 'assets', 'images', 'logo.png'),
+        icon: path.join(__dirname, '..', 'assets', 'images', 'logo.ico'),
         // NOTE v1.2.0: native frame. The old custom-electron-titlebar
-        // dependency was removed (unmaintained + remote-based + heavier).
+        // dependency was removed (unmaintained + remote-based).
+        // v1.3.0: keep native frame but hide the OS menu bar — we render a
+        // custom themed menubar in index.html (File/Edit/View...).
         frame: true,
-        autoHideMenuBar: false,
+        autoHideMenuBar: true,
         webPreferences: {
-            // Security hardening: no Node in the renderer, isolated
-            // context, sandboxed renderer. All privileged access goes
-            // through src/js/preload.js via a minimal contextBridge API.
             nodeIntegration: false,
             contextIsolation: true,
             sandbox: true,
-            enableRemoteModule: false,
             preload: path.join(__dirname, 'preload.js')
         }
     });
@@ -101,11 +103,39 @@ function createWindow() {
 
     // Create the application menu (File/Edit/View/Help + recent files).
     buildAppMenu();
+    try { win.setMenuBarVisibility(false); } catch(e){}
 }
 
-// v1.2.2 refinement: menu lives in one rebuildable place so the
-// Open Recent list refreshes the moment it changes.
-const recent = require('./recent');
+// Theme persistence (lightweight, userData JSON). Valid names come from
+// the shared theme-list.js so main and renderer can never disagree.
+const THEME_FILE = path.join(app.getPath('userData'), 'foxypdf-theme.json');
+const VALID_THEMES = new Set(THEME_LIST.THEMES);
+function loadThemePref(){ try{ if(!fs.existsSync(THEME_FILE)) return null; const j=JSON.parse(fs.readFileSync(THEME_FILE,'utf8').slice(0,4096)); if(j&&VALID_THEMES.has(j.theme)) return {theme:j.theme, accent:j.accent||"green"}; }catch(e){} return null; }
+function saveThemePref(theme,accent){ try{ fs.writeFileSync(THEME_FILE, JSON.stringify({theme, accent: accent||"green"}).slice(0,4096),'utf8'); }catch(e){} }
+ipcMain.handle('get-theme', async()=> loadThemePref() || {theme:"dark", accent:"green"});
+ipcMain.handle('save-theme', async(e,d)=>{ if(d&&VALID_THEMES.has(d.theme)) saveThemePref(d.theme,d.accent); return {ok:true}; });
+ipcMain.handle('get-recent', async()=> recent.loadRecent());
+
+// v1.3.0: per-file reader state (last page + bookmarks).
+ipcMain.handle('state-get-file', async (e, d) => {
+    if (!d || typeof d.pdfPath !== 'string') { return { page: 1, bookmarks: [] }; }
+    return readerState.getFileState(d.pdfPath);
+});
+ipcMain.handle('state-set-lastpage', async (e, d) => {
+    if (!d || typeof d.pdfPath !== 'string') { return { page: 1, bookmarks: [] }; }
+    return readerState.setLastPage(d.pdfPath, d.page);
+});
+ipcMain.handle('state-toggle-bookmark', async (e, d) => {
+    if (!d || typeof d.pdfPath !== 'string') { return null; }
+    return readerState.toggleBookmark(d.pdfPath, d.page);
+});
+ipcMain.handle('state-clear-bookmarks', async (e, d) => {
+    if (!d || typeof d.pdfPath !== 'string') { return { page: 1, bookmarks: [] }; }
+    return readerState.clearBookmarks(d.pdfPath);
+});
+
+// Menu lives in one rebuildable place so the Open Recent list refreshes
+// the moment it changes.
 let appMenu = null;
 // v1.2.2 refinement: menu rebuilds wipe item state — remember it.
 let menuItemsEnabled = false;
@@ -140,7 +170,6 @@ function buildAppMenu() {
                         nodeIntegration: false,
                         contextIsolation: true,
                         sandbox: true,
-                        enableRemoteModule: false,
                         preload: path.join(__dirname, 'preload.js')
                     }
                 });
@@ -167,6 +196,47 @@ ipcMain.on('recent-add', (event, pdfPath) => {
     recent.touchRecent(pdfPath);
 });
 recent.setOnChange(() => { buildAppMenu(); });
+
+// v1.3.0: custom themed menubar (renderer) forwards clicks here so the
+// native hidden menu still provides accelerators but the visual bar is themed.
+ipcMain.on('custom-menu-action', async (event, data) => {
+    const senderWin = BrowserWindow.fromWebContents(event.sender) || win;
+    if (!senderWin) return;
+    let action = '', arg = undefined;
+    if (typeof data === 'string') {
+        // Split on the FIRST colon only: Windows paths (C:\...) carry
+        // their own colons, and the action names never contain one.
+        const idx = data.indexOf(':');
+        if (idx >= 0) { action = data.slice(0, idx); arg = data.slice(idx + 1); }
+        else { action = data; }
+    } else if (data && typeof data.action === 'string') {
+        action = data.action; arg = data.arg;
+    } else return;
+    const act = String(action||'');
+    if (act === 'file-open') {
+        const opts = { properties: ['openFile'], filters: [{ name: 'PDF Files', extensions: ['pdf'] }] };
+        const lastDir = recent.loadRecent().lastDir;
+        if (lastDir) opts.defaultPath = lastDir;
+        const { canceled, filePaths } = await dialog.showOpenDialog(senderWin, opts);
+        if (!canceled && filePaths && filePaths[0]) senderWin.webContents.send('file-open', filePaths[0]);
+    } else if (act === 'file-open-path') {
+        if (typeof arg === 'string' && arg) senderWin.webContents.send('file-open', arg);
+    } else if (act === 'file-print') senderWin.webContents.send('file-print');
+    else if (act === 'file-save') senderWin.webContents.send('file-save');
+    else if (act === 'file-save-as') senderWin.webContents.send('file-save-as');
+    else if (act === 'file-properties') senderWin.webContents.send('file-properties');
+    else if (act === 'file-close') senderWin.webContents.send('file-close');
+    else if (act === 'app-quit') app.quit();
+    else if (act === 'undo-struct') senderWin.webContents.send('undo-struct');
+    else if (act === 'view-fullscreen') senderWin.webContents.send('view-fullscreen');
+    else if (act === 'toggle-devtools' && senderWin) senderWin.webContents.toggleDevTools();
+    else if (act === 'set-theme' && typeof arg === 'string') senderWin.webContents.send('set-theme', arg);
+    else if (act === 'about') {
+        const aboutItem = appMenu && appMenu.getMenuItemById('about');
+        if (aboutItem && aboutItem.click) aboutItem.click();
+    } else if (act === 'clear-recent') recent.clearRecent();
+    else if (act === 'remove-recent' && typeof arg === 'string') recent.removeRecent(arg);
+});
 
 // Add event listener for enabling/disabling menu items (module level:
 // registered once, survives menu rebuilds via appMenu).
@@ -196,10 +266,32 @@ function annotSidecarPath(pdfPath) {
     return path.join(dir, hash + '.json');
 }
 
+// File fingerprint: size + mtime guard against stale sidecars (the PDF on
+// disk may have been replaced since the sidecar was written).
+function fileFingerprint(logicalPath) {
+    try {
+        const st = fs.statSync(logicalPath);
+        return { size: st.size, mtime: Math.floor(st.mtimeMs / 1000) };
+    } catch (e) { return null; }
+}
+
+// Single writer for every sidecar update (annot-save, structure-bake,
+// use-temp, post-save clear). Always stamps the fingerprint so readers can
+// detect a replaced file instead of resurrecting dead annotations.
+function writeSidecar(logicalPath, annots, visOps) {
+    const payload = JSON.stringify({
+        v: 2, annots: annots || {}, visOps: visOps || null,
+        fp: fileFingerprint(logicalPath)
+    }).slice(0, 10 * 1024 * 1024);
+    fs.writeFileSync(annotSidecarPath(logicalPath), payload, 'utf8');
+}
+
 ipcMain.handle('annot-load', async (event, data) => {
     try {
         const pdfPath = data && data.pdfPath;
         if (typeof pdfPath !== 'string' || !pdfPath) { return { ok: false }; }
+        discardedPaths.delete(pdfPath); // re-allow saves for this path
+        pruneDiscardedPaths(); // keep set bounded
         const sidecar = readSidecar(pdfPath);
         return { ok: true, annots: sidecar.annots, visOps: sidecar.visOps };
     } catch (e) {
@@ -211,11 +303,13 @@ ipcMain.handle('annot-save', async (event, data) => {
     try {
         const pdfPath = data && data.pdfPath;
         if (typeof pdfPath !== 'string' || !pdfPath || !data.annots) { return { ok: false }; }
-        const payload = JSON.stringify({
-            v: 2, annots: data.annots, visOps: data.visOps || null
-        }).slice(0, 10 * 1024 * 1024);
-        fs.writeFileSync(annotSidecarPath(pdfPath), payload, 'utf8');
-        markDirty(pdfPath); // v1.2.2
+        // If this file was just discarded (tab closed with "Don't Save"),
+        // skip writing — the sidecar was intentionally deleted.
+        if (discardedPaths.has(pdfPath)) { return { ok: false, discarded: true }; }
+        const s = sessions[pdfPath];
+        if (s && s.discarded) { return { ok: false, discarded: true }; }
+        writeSidecar(pdfPath, data.annots, data.visOps);
+        markDirty(pdfPath);
         return { ok: true };
     } catch (e) {
         return { ok: false };
@@ -234,7 +328,21 @@ ipcMain.handle('annot-save', async (event, data) => {
  * - Undo of a bake restores the previous temp + sidecar snapshot.
  *----------------------------------------------------------------------------*/
 const sessions = {}; // logicalPath -> { tempPath, tempHistory[], dirty }
+const discardedPaths = new Set(); // v1.3.1: paths where sidecar was discarded
+const DISCARDED_MAX = 500; // v1.3.3: prevent unbounded growth
 const TEMP_HIST_CAP = 5;
+
+// v1.3.3: Keep discardedPaths bounded (LRU-style: remove oldest when over limit)
+function pruneDiscardedPaths() {
+    if (discardedPaths.size > DISCARDED_MAX) {
+        const toRemove = discardedPaths.size - DISCARDED_MAX;
+        const iter = discardedPaths.values();
+        for (let i = 0; i < toRemove; i++) {
+            const v = iter.next().value;
+            if (v !== undefined) { discardedPaths.delete(v); }
+        }
+    }
+}
 
 function getSession(logicalPath) {
     if (!sessions[logicalPath]) {
@@ -263,7 +371,7 @@ function dropTemps(logicalPath) {
 // Delete stale lector temps from previous crashed sessions (startup).
 function cleanStaleTemps() {
     try {
-        const dir = require('os').tmpdir();
+        const dir = os.tmpdir();
         fs.readdirSync(dir).forEach((f) => {
             if (/^lector-[0-9a-f]{10}-\d+\.pdf$/.test(f)) {
                 try { fs.unlinkSync(path.join(dir, f)); } catch (e) { /* ignore */ }
@@ -295,6 +403,18 @@ function readSidecar(logicalPath) {
         if (!fs.existsSync(file)) { return empty; }
         const raw = JSON.parse(fs.readFileSync(file, 'utf8').slice(0, 10 * 1024 * 1024));
         if (!raw || typeof raw !== 'object') { return empty; }
+        // v1.3.1: Validate file fingerprint — if the PDF on disk has a
+        // different size or mtime than when the sidecar was saved, the
+        // sidecar is stale (user replaced the file). Return empty.
+        if (raw.fp && typeof raw.fp.size === 'number') {
+            try {
+                const st = fs.statSync(logicalPath);
+                if (st.size !== raw.fp.size ||
+                    Math.floor(st.mtimeMs / 1000) !== raw.fp.mtime) {
+                    return empty; // stale: the PDF was replaced on disk
+                }
+            } catch (e) { /* stat failed: use the sidecar as-is */ }
+        }
         if (Array.isArray(raw.order) || raw.annots) {
             return {
                 annots: raw.annots || {},
@@ -375,7 +495,7 @@ async function doSavePdf(event, logicalPath, mode) {
             dropTemps(logicalPath);
             const s = getSession(logicalPath);
             s.dirty = false;
-            try { fs.writeFileSync(annotSidecarPath(logicalPath), '{}', 'utf8'); } catch (e) { /* ignore */ }
+            try { writeSidecar(logicalPath, {}, null); } catch (e) { /* ignore */ }
             notifyDirty(logicalPath);
             return { ok: true, path: logicalPath, mode: 'overwrite', backup: backupPath, cleared: true };
         }
@@ -424,16 +544,13 @@ ipcMain.handle('structure-bake', async (event, data) => {
             }
         }
         const hash = crypto.createHash('sha1').update(originalPath).digest('hex').slice(0, 10);
-        const tempPath = path.join(require('os').tmpdir(),
+        const tempPath = path.join(os.tmpdir(),
             'lector-' + hash + '-' + Date.now() + '.pdf');
         fs.writeFileSync(tempPath, Buffer.from(outBytes));
         s.tempPath = tempPath;
         // Remap annots onto baked positions; visOps reset (baked in).
         try {
-            const remapped = remapForBake(data.annots || {}, ops);
-            fs.writeFileSync(annotSidecarPath(originalPath), JSON.stringify({
-                v: 2, annots: remapped, visOps: null
-            }).slice(0, 10 * 1024 * 1024), 'utf8');
+            writeSidecar(originalPath, remapForBake(data.annots || {}, ops), null);
         } catch (e) { /* ignore */ }
         markDirty(originalPath);
         return { ok: true, tempPath };
@@ -469,11 +586,8 @@ ipcMain.handle('use-temp', async (event, data) => {
         s.tempPath = tempPath;
         s.tempHistory = keep.slice(1);
         if (data.annots) {
-            try {
-                fs.writeFileSync(annotSidecarPath(originalPath), JSON.stringify({
-                    v: 2, annots: data.annots, visOps: null
-                }).slice(0, 10 * 1024 * 1024), 'utf8');
-            } catch (e) { /* ignore */ }
+            try { writeSidecar(originalPath, data.annots, null); }
+            catch (e) { /* ignore */ }
         }
         markDirty(originalPath);
         return { ok: true, tempPath };
@@ -529,30 +643,36 @@ ipcMain.handle('confirm-dirty', async (event, data) => {
     return ['save', 'saveas', 'discard', 'cancel'][response] || 'cancel';
 });
 
+// Single source for "which files have unsaved changes" (dirty-list IPC
+// and the quit guard must never disagree).
+function listDirty() {
+    try {
+        return Object.keys(sessions).filter((p) => sessions[p].dirty && fs.existsSync(p));
+    } catch (e) { return []; }
+}
+
 ipcMain.handle('get-dirty-list', async () => {
-    return Object.keys(sessions).filter((p) => sessions[p].dirty && fs.existsSync(p));
+    return listDirty();
 });
 
 ipcMain.handle('discard-changes', async (event, data) => {
-    // v1.2.2 refinement: TRUE revert — drop temps, dirty flag AND clear
-    // structural ops from the sidecar (deleted/rotated/reordered pages come
-    // back on reopen). Draft annotations are kept (autosave behavior).
+    // TRUE discard — delete the sidecar entirely so annotations are
+    // gone on next open. Also mark session as discarded so any pending
+    // annot-save IPC calls skip writing (prevents race condition).
     try {
         const p = data && data.pdfPath;
         dropTemps(p);
         if (p && sessions[p]) {
+            sessions[p].discarded = true;
             delete sessions[p];
         }
         if (typeof p === 'string' && p) {
+            discardedPaths.add(p); // block pending annot-save
+            pruneDiscardedPaths(); // keep set bounded
             try {
                 const file = annotSidecarPath(p);
-                if (fs.existsSync(file)) {
-                    const cur = readSidecar(p);
-                    fs.writeFileSync(file, JSON.stringify({
-                        v: 2, annots: cur.annots || {}, visOps: null
-                    }).slice(0, 10 * 1024 * 1024), 'utf8');
-                }
-            } catch (e) { /* sidecar best-effort */ }
+                if (fs.existsSync(file)) { fs.unlinkSync(file); }
+            } catch (e) { /* best-effort */ }
         }
         notifyDirty(p);
         return { ok: true };
@@ -581,24 +701,17 @@ function armCloseGuard(targetWin) {
         });
     });
 }
-// Drop structural ops from a sidecar (used by Discard paths so reopened
-// files show pristine pages; draft annotations are kept).
+// Drop a file's sidecar (used by Discard paths so a reopened file shows
+// pristine pages — annotations AND structural ops are gone together).
 function clearVisOps(logicalPath) {
     try {
         const file = annotSidecarPath(logicalPath);
-        if (!fs.existsSync(file)) { return; }
-        const cur = readSidecar(logicalPath);
-        fs.writeFileSync(file, JSON.stringify({
-            v: 2, annots: cur.annots || {}, visOps: null
-        }).slice(0, 10 * 1024 * 1024), 'utf8');
+        if (fs.existsSync(file)) { fs.unlinkSync(file); }
     } catch (e) { /* best-effort */ }
 }
 
 async function quitWithPrompt(targetWin) {
-    let dirty = [];
-    try {
-        dirty = Object.keys(sessions).filter((p) => sessions[p].dirty && fs.existsSync(p));
-    } catch (err) { dirty = []; }
+    const dirty = listDirty();
     if (dirty.length === 0) {
         forceQuit = true;
         if (!targetWin.isDestroyed()) { targetWin.close(); }
@@ -701,7 +814,3 @@ if (!gotTheLock) {
         }
     });
 }
-
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

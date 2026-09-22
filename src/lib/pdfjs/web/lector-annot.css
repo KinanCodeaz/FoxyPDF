@@ -1,4 +1,4 @@
-/* Lector annotation overlay styles (v1.2.1 by KinanDev, MIT License). */
+/* Lector annotation overlay styles (v1.3.0 by KinanDev, MIT License). */
 canvas.lector-annot {
   position: absolute !important;
   left: 0; top: 0;
@@ -7,61 +7,296 @@ canvas.lector-annot {
   touch-action: none;
   cursor: crosshair;
 }
+/* v1.3.0: Push PDF.js toolbar down by 32px to make room for annotation bar.
+   Uses !important to override vendored viewer.css (Apache 2.0, untouched). */
+#toolbarContainer { margin-top: 32px !important; }
+.toolbar { margin-top: 32px !important; }
+#sidebarContainer { top: 32px !important; }
+.loadingInProgress #sidebarContainer { top: 68px !important; }
+#sidebarContent { top: 64px !important; }
+#viewerContainer { top: 64px !important; }
+.findbar { top: 64px !important; }
+.secondaryToolbar { top: 32px !important; }
+/* v1.3.0 (KinanDev): Annotation bar — matches PDF.js toolbar look exactly.
+   Same #1e1e1e background, same 32px height, same box-shadow. */
 #lectorAnnotBar {
   position: fixed;
-  top: 44px;
-  right: 8px;
-  left: auto;
-  z-index: 9999;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100000;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 4px;
-  max-width: 46px;
-  padding: 6px 4px;
-  background: rgba(30, 30, 30, 0.92);
-  border: 1px solid #555;
-  border-radius: 8px;
+  justify-content: center;
+  gap: 1px;
+  height: 32px;
+  padding: 0 8px;
+  background-color: #1e1e1e;
+  box-shadow: inset 0 1px 1px hsla(0,0%,0%,.15),
+              inset 0 -1px 0 hsla(0,0%,100%,.05),
+              0 1px 0 hsla(0,0%,0%,.15),
+              0 1px 1px hsla(0,0%,0%,.1);
+  border: none;
+  border-radius: 0;
   direction: ltr;
+  scrollbar-width: none;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
+#lectorAnnotBar::-webkit-scrollbar { display: none; }
 #lectorAnnotBar .la-btn {
-  width: 34px; height: 30px;
-  font-size: 15px;
-  background: #3a3a3a;
-  color: #fff;
-  border: 1px solid #666;
-  border-radius: 5px;
+  width: 32px; height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #ccc;
+  border: none;
+  border-radius: 0;
   cursor: pointer;
+  flex: 0 0 auto;
+  transition: background 0.15s, color 0.15s;
 }
-#lectorAnnotBar .la-btn:hover { background: #505050; }
-#lectorAnnotBar .la-btn.active { background: #0a84ff; border-color: #0a84ff; }
-#lectorAnnotBar .la-save { background: #1e7e34; border-color: #1e7e34; }
+#lectorAnnotBar .la-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+#lectorAnnotBar .la-btn.active { background: #424242; color: #0a84ff; }
+#lectorAnnotBar .la-btn svg {
+  width: 18px;
+  height: 18px;
+}
+#lectorAnnotBar .la-save {
+  background: #1e7e34;
+  color: #fff;
+  border-radius: 0;
+}
+#lectorAnnotBar .la-save:hover {
+  background: #28a745;
+}
+/* v1.3.0: color circles */
 #lectorAnnotBar .la-color {
-  width: 24px; height: 24px;
-  border: 2px solid #888;
+  width: 22px; height: 22px;
+  border: 2px solid rgba(255,255,255,0.2);
   border-radius: 50%;
   cursor: pointer;
   padding: 0;
+  flex: 0 0 auto;
+  transition: border-color 0.15s, transform 0.15s;
 }
-#lectorAnnotBar .la-color.active { border-color: #fff; }
+#lectorAnnotBar .la-color:hover {
+  transform: scale(1.15);
+}
+#lectorAnnotBar .la-color.active {
+  border-color: #fff;
+  transform: scale(1.15);
+}
+/* v1.3.0: custom color picker */
+#lectorAnnotBar .la-customcolor {
+  width: 22px; height: 22px;
+  border: 2px dashed rgba(255,255,255,0.3);
+  border-radius: 50%;
+  background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+  cursor: pointer;
+  padding: 0;
+  flex: 0 0 auto;
+}
+#lectorAnnotBar .la-customcolor::-webkit-color-swatch-wrapper { padding: 2px; }
+#lectorAnnotBar .la-customcolor::-webkit-color-swatch { border: none; border-radius: 50%; }
 #lectorAnnotBar .la-sel {
-  width: 100%;
+  height: 26px;
+  min-width: 52px;
+  font-size: 11px;
+  background: rgba(255,255,255,0.08);
+  color: #ddd;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  padding: 0 4px;
+  flex: 0 0 auto;
+}
+#lectorAnnotBar .la-sep {
+  width: 1px;
+  height: 22px;
+  background: rgba(255,255,255,0.15);
+  margin: 0 4px;
+  flex: 0 0 auto;
+}
+/* v1.3.0: stamp row — built-in icons only */
+#lectorStampRow {
+  display: none;
+  align-items: center;
+  gap: 3px;
+  padding-left: 4px;
+  border-left: 1px solid rgba(255,255,255,0.15);
+  margin-left: 2px;
+}
+#lectorAnnotBar .la-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+#lectorAnnotBar .la-icon svg {
+  width: 18px;
+  height: 18px;
+}
+/* v1.3.0: stamp control panel (size + rotation) — matches PDF.js style */
+#lectorStampControls {
+  position: fixed;
+  top: 32px;
+  left: 0; right: 0;
+  z-index: 100000;
+  display: none;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 12px;
+  height: 28px;
+  background-color: #1e1e1e;
+  box-shadow: inset 0 1px 1px hsla(0,0%,0%,.15),
+              inset 0 -1px 0 hsla(0,0%,100%,.05),
+              0 1px 0 hsla(0,0%,0%,.15);
+  color: #ddd;
   font-size: 12px;
-  background: #3a3a3a;
+}
+#lectorStampControls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+#lectorStampControls input[type="range"] {
+  width: 100px;
+  height: 4px;
+  -webkit-appearance: none;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+  outline: none;
+}
+#lectorStampControls input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #0a84ff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+#lectorStampControls .la-val {
+  min-width: 36px;
+  text-align: right;
+  color: #aaa;
+  font-size: 11px;
+}
+/* v1.3.0: Text properties panel — matches PDF.js style */
+#lectorTextPanel {
+  position: fixed;
+  top: 32px;
+  left: 0; right: 0;
+  z-index: 100000;
+  display: none;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 28px;
+  background-color: #1e1e1e;
+  box-shadow: inset 0 1px 1px hsla(0,0%,0%,.15),
+              inset 0 -1px 0 hsla(0,0%,100%,.05),
+              0 1px 0 hsla(0,0%,0%,.15);
+  color: #ddd;
+  font-size: 12px;
+}
+#lectorTextPanel label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+#lectorTextPanel select,
+#lectorTextPanel input[type="range"],
+#lectorTextPanel input[type="number"] {
+  height: 24px;
+  font-size: 11px;
+  background: rgba(255,255,255,0.08);
+  color: #ddd;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+#lectorTextPanel select {
+  min-width: 80px;
+}
+#lectorTextPanel input[type="number"] {
+  width: 48px;
+}
+#lectorTextPanel input[type="range"] {
+  width: 60px;
+  -webkit-appearance: none;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+  outline: none;
+}
+#lectorTextPanel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #0a84ff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+#lectorTextPanel .la-text-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.08);
+  color: #ddd;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+#lectorTextPanel .la-text-btn:hover {
+  background: rgba(255,255,255,0.15);
+}
+#lectorTextPanel .la-text-btn.active {
+  background: #0a84ff;
   color: #fff;
-  border: 1px solid #666;
-  border-radius: 5px;
 }
-#lectorAnnotBar .la-grip {
-  width: 100%;
-  text-align: center;
-  color: #999;
+/* v1.3.0: Clip/copy tool — animated selection border */
+#lectorClipOverlay {
+  position: absolute;
+  z-index: 25;
+  border: 2px dashed #0a84ff;
+  border-radius: 4px;
+  pointer-events: none;
+  animation: lectorClipDash 0.5s linear infinite;
+}
+@keyframes lectorClipDash {
+  to { background-position: 100% 0; }
+}
+.lector-clip-selection {
+  position: absolute;
+  z-index: 26;
+  border: 2px solid #0a84ff;
+  border-radius: 4px;
+  background: rgba(10,132,255,0.1);
   cursor: move;
-  user-select: none;
-  font-size: 12px;
-  letter-spacing: 2px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
-#lectorFab.dragging { opacity: 0.7; }
+.lector-clip-selection .la-clip-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #0a84ff;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  cursor: pointer;
+}
 /* v1.2.2: top-toolbar entry buttons.
    v1.2.2 refinement: TEXT labels, not emoji-only. The viewer's CSS hides
    button spans (width:0) and some systems lack color-emoji fonts, which
@@ -375,19 +610,15 @@ canvas.lector-annot {
   cursor: pointer;
   font-size: 13px;
 }
-#lectorFab {
-  position: fixed;
-  top: 44px;
-  right: 8px;
-  left: auto;
-  z-index: 9999;
-  width: 40px; height: 40px;
-  font-size: 20px;
-  background: rgba(30, 30, 30, 0.92);
-  color: #ffd60a;
-  border: 1px solid #555;
-  border-radius: 50%;
-  cursor: pointer;
+/* v1.3.0: NIGHT reading mode — white text on black page.
+   Only the rendered page canvas is inverted (hue-rotate keeps colors
+   recognizable); our annotation overlay canvas is left untouched. */
+.lector-night .page {
+  background: #111 !important;
+  border-color: #333 !important;
+}
+.lector-night .page canvas:not(.lector-annot) {
+  filter: invert(1) hue-rotate(180deg);
 }
 #lectorToast {
   position: fixed;
@@ -414,4 +645,248 @@ textarea.lector-textedit {
   border-radius: 4px;
   padding: 4px;
   resize: both;
+}
+
+/* ============================================================================
+   v1.3.4: PROPERTIES / LAYERS PANEL (right side) + ROTATION/RESIZE HANDLES
+   ============================================================================ */
+
+/* Right-side Properties/Layers Panel */
+#lectorPropsPanel {
+  position: fixed;
+  top: 32px;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  max-width: 100vw;
+  z-index: 99999;
+  display: none;
+  flex-direction: column;
+  background: #1e1e1e;
+  border-left: 1px solid #444;
+  box-shadow: -4px 0 16px rgba(0,0,0,0.3);
+  color: #ddd;
+  font-size: 13px;
+  overflow: hidden;
+}
+#lectorPropsPanel.open { display: flex; }
+
+#lectorPropsPanel .lo-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid #444;
+  background: #252525;
+}
+#lectorPropsPanel .lo-header .spacer { flex: 1; }
+#lectorPropsPanel .lo-header button {
+  width: 28px; height: 28px;
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+#lectorPropsPanel .lo-header button:hover { background: #333; color: #fff; }
+
+#lectorPropsPanel .lo-tabs {
+  display: flex;
+  border-bottom: 1px solid #444;
+  background: #252525;
+}
+#lectorPropsPanel .lo-tab {
+  flex: 1;
+  padding: 8px 0;
+  background: transparent;
+  color: #aaa;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 0.15s, border-color 0.15s;
+}
+#lectorPropsPanel .lo-tab:hover { color: #ddd; }
+#lectorPropsPanel .lo-tab.active { color: #0a84ff; border-bottom-color: #0a84ff; }
+
+#lectorPropsPanel .lo-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: none;
+}
+#lectorPropsPanel .lo-content.active { display: block; }
+
+/* Layers List */
+#lectorLayersList {
+  list-style: none;
+  margin: 0; padding: 0;
+}
+.lo-layer-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+}
+.lo-layer-item:hover { background: #2a2a2a; }
+.lo-layer-item.selected { background: #0a84ff20; border-color: #0a84ff; }
+.lo-layer-item .lo-vis { width: 20px; height: 20px; flex-shrink: 0; cursor: pointer; }
+.lo-layer-item .lo-vis svg { width: 16px; height: 16px; }
+.lo-layer-item .lo-info { flex: 1; min-width: 0; }
+.lo-layer-item .lo-type { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+.lo-layer-item .lo-name { font-size: 13px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lo-layer-item .lo-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
+.lo-layer-item:hover .lo-actions { opacity: 1; }
+.lo-layer-item .lo-act { width: 24px; height: 24px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.lo-layer-item:hover .lo-act { background: #444; color: #fff; }
+
+/* Properties Form */
+.lo-prop-group { margin-bottom: 16px; }
+.lo-prop-group label { display: block; font-size: 11px; color: #aaa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.lo-prop-group input[type="text"],
+.lo-prop-group input[type="number"],
+.lo-prop-group select,
+.lo-prop-group textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: #2a2a2a;
+  color: #ddd;
+  border: 1px solid #555;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.lo-prop-group input:focus,
+.lo-prop-group select:focus,
+.lo-prop-group textarea:focus {
+  outline: none;
+  border-color: #0a84ff;
+  box-shadow: 0 0 0 2px #0a84ff40;
+}
+.lo-prop-row { display: flex; gap: 8px; }
+.lo-prop-row > * { flex: 1; }
+.lo-color-row { display: flex; gap: 8px; align-items: center; }
+.lo-color-swatch { width: 32px; height: 28px; border-radius: 4px; border: 2px solid #555; cursor: pointer; flex-shrink: 0; }
+.lo-color-swatch:hover { transform: scale(1.05); }
+.lo-prop-check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.lo-prop-check input { width: 16px; height: 16px; accent-color: #0a84ff; }
+.lo-prop-check span { font-size: 13px; color: #ddd; }
+
+/* Rotation Handle (on canvas) */
+.lo-rotate-handle {
+  position: absolute;
+  width: 18px; height: 18px;
+  background: #0a84ff;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  cursor: grab;
+  z-index: 100;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  display: flex; align-items: center; justify-content: center;
+}
+.lo-rotate-handle::before {
+  content: '';
+  width: 8px; height: 8px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M23 4v6h-6'/%3E%3Cpath d='M1 20v-6h6'/%3E%3Cpath d='M3.51 9a9 9 0 0114.85-3.36L23 10'/%3E") center/contain no-repeat;
+}
+.lo-rotate-handle.dragging { cursor: grabbing; }
+
+/* Resize Handles (8 corners/edges for box annotations) */
+.lo-resize-handle {
+  position: absolute;
+  width: 14px; height: 14px;
+  background: #0a84ff;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.lo-resize-handle.nw { cursor: nwse-resize; top: -7px; left: -7px; }
+.lo-resize-handle.n  { cursor: ns-resize;   top: -7px; left: 50%; transform: translateX(-50%); }
+.lo-resize-handle.ne { cursor: nesw-resize; top: -7px; right: -7px; }
+.lo-resize-handle.e  { cursor: ew-resize;   top: 50%; right: -7px; transform: translateY(-50%); }
+.lo-resize-handle.se { cursor: nwse-resize; bottom: -7px; right: -7px; }
+.lo-resize-handle.s  { cursor: ns-resize;   bottom: -7px; left: 50%; transform: translateX(-50%); }
+.lo-resize-handle.sw { cursor: nesw-resize; bottom: -7px; left: -7px; }
+.lo-resize-handle.w  { cursor: ew-resize;   top: 50%; left: -7px; transform: translateY(-50%); }
+
+/* Selection Box (for selected annotation) */
+.lo-selection-box {
+  position: absolute;
+  border: 2px dashed #0a84ff;
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* Organizer Panel - close button + toggle */
+#lectorOrganizer .lo-head .lo-close {
+  width: 28px; height: 28px;
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+#lectorOrganizer .lo-head .lo-close:hover { background: #a00; color: #fff; border-color: #a00; }
+
+/* Measurement Tools - distinguish tools + adjustable */
+.lo-measure-toolbar {
+  position: fixed;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100000;
+  display: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  height: 28px;
+  background-color: #1e1e1e;
+  box-shadow: inset 0 1px 1px hsla(0,0%,0%,.15),
+              inset 0 -1px 0 hsla(0,0%,100%,.05),
+              0 1px 0 hsla(0,0%,0%,.15);
+  color: #ddd;
+  font-size: 12px;
+  border-radius: 0 0 8px 8px;
+}
+.lo-measure-toolbar.open { display: flex; }
+.lo-measure-toolbar label { display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 11px; color: #aaa; }
+.lo-measure-toolbar select,
+.lo-measure-toolbar input[type="number"] {
+  height: 24px; font-size: 11px;
+  background: rgba(255,255,255,0.08); color: #ddd;
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 0 8px;
+}
+.lo-measure-toolbar .lo-measure-type {
+  display: flex; align-items: center; gap: 4px; padding: 0 8px;
+  background: rgba(255,255,255,0.08); border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+/* Delete vs Clear - better visual distinction */
+#lectorAnnotBar .la-btn[data-tool="delete"] { position: relative; }
+#lectorAnnotBar .la-btn[data-tool="delete"]::after {
+  content: '1'; position: absolute; top: -2px; right: -2px;
+  width: 14px; height: 14px; background: #ef5350; color: #fff;
+  font-size: 9px; font-weight: bold; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+#lectorAnnotBar .la-btn[data-tool="clear"] { position: relative; }
+#lectorAnnotBar .la-btn[data-tool="clear"]::after {
+  content: 'ALL'; position: absolute; top: -2px; right: -2px;
+  min-width: 22px; height: 14px; background: #ff7043; color: #fff;
+  font-size: 7px; font-weight: bold; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; padding: 0 3px;
 }
